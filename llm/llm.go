@@ -1,4 +1,4 @@
-package model
+package llm
 
 // Request represents the data needed to generate a prompt for the LLM
 type Request struct {

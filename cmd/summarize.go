@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/llm"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/prompt"
 	"github.com/spf13/cobra"
 )
@@ -25,15 +27,16 @@ var summarizeCmd = &cobra.Command{
 		// Get provider flag
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
-		var llm model.LLM
+
+		var llmClient llm.LLM
 		var err error
 		switch provider {
 		case "openai":
 			// Create a new OpenAI model
-			llm, err = model.NewOpenAI(apiKey,
-				model.WithModel(model),
-				model.WithMaxTokens(4000),
-				model.WithAPITimeout(60),
+			llmClient, err = llm.NewOpenAI(apiKey,
+				llm.WithModel(model),
+				llm.WithMaxTokens(4000),
+				llm.WithAPITimeout(60),
 			)
 		default:
 			fmt.Printf("Unsupported provider: %s\n", provider)
@@ -45,20 +48,46 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
+		fmt.Println("")
+		fmt.Println("Using LLM Provider:", provider)
+		fmt.Println("With Model:", model)
+
+		git := git.NewClient(git.NewDefaultRunner("."))
+		diff := ""
+
+		commitFlag := cmd.Flags().Changed("commit")
+		if commitFlag {
+			commit_hash, _ := cmd.Flags().GetString("commit")
+			if commit_hash == "" {
+				commit_hash, err = git.GetCurrentCommitHash()
+				if err != nil {
+					fmt.Printf("Error getting current commit hash: %v\n", err)
+					return
+				}
+			}
+
+			diff, err = git.GetDiffWithParent(commit_hash)
+			if err != nil {
+				fmt.Printf("Error getting diff with parent: %v\n", err)
+				return
+			}
+		}
+
 		// Create a request
-		req := model.Request{
+		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(),
 			UserPrompt:   prompt.GetSummarizePrompt(),
-			Diff:         prompt.GetDiffPrompt(""),
+			Diff:         prompt.GetDiffPrompt(diff),
 		}
 
 		// Send the prompt and get the response
-		resp := llm.Prompt(req)
+		resp := llmClient.Prompt(req)
 		if resp.Error != nil {
 			fmt.Printf("Error getting response: %v\n", resp.Error)
 			return
 		}
 
+		fmt.Println("")
 		fmt.Println("Response from LLM:")
 		fmt.Println(resp.Content)
 	},
@@ -70,6 +99,7 @@ func init() {
 	// Add flags specific to review command
 	summarizeCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
 	summarizeCmd.Flags().StringP("model", "m", "gpt-4o", "LLM model to use for summarization")
-	summarizeCmd.Flags().StringP("pr", "p", "", "Pull request URL or ID to review")
-	summarizeCmd.Flags().StringP("branch", "b", "", "Branch to review")
+	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit")
+	// summarizeCmd.Flags().StringP("pr", "p", "", "Pull request URL or ID to review")
+	// summarizeCmd.Flags().StringP("branch", "b", "", "Branch to review")
 }
