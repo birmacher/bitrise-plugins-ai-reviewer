@@ -73,6 +73,11 @@ var summarizeCmd = &cobra.Command{
 			}
 		}
 
+		if diff == "" {
+			fmt.Println("No diff found. Please provide a commit hash or ensure there are changes to summarize.")
+			return
+		}
+
 		// Create a request
 		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(),
@@ -99,7 +104,8 @@ func init() {
 	// Add flags specific to review command
 	summarizeCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
 	summarizeCmd.Flags().StringP("model", "m", "gpt-4o", "LLM model to use for summarization")
-	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit")
+	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit (optional, uses current commit if not provided)")
+	summarizeCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
 	// summarizeCmd.Flags().StringP("pr", "p", "", "Pull request URL or ID to review")
 	// summarizeCmd.Flags().StringP("branch", "b", "", "Branch to review")
 }
