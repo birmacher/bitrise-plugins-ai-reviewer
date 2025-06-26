@@ -1,0 +1,16 @@
+name: ai-reviewer
+description: |-
+  Bitrise plugin for reviewing code using AI.
+  
+  This plugin uses AI to analyze code changes and provide feedback.
+
+executable:
+  osx: ./bin/ai-reviewer
+  linux: ./bin/ai-reviewer
+
+requirements:
+- tool: bitrise
+  min_version: 1.10.0
+  max_version: ""
+
+trigger: ""
