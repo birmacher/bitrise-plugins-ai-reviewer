@@ -55,26 +55,16 @@ var summarizeCmd = &cobra.Command{
 		git := git.NewClient(git.NewDefaultRunner("."))
 		diff := ""
 
-		commitFlag := cmd.Flags().Changed("commit")
-		if commitFlag {
-			commit_hash, _ := cmd.Flags().GetString("commit")
-			if commit_hash == "" {
-				commit_hash, err = git.GetCurrentCommitHash()
-				if err != nil {
-					fmt.Printf("Error getting current commit hash: %v\n", err)
-					return
-				}
-			}
-
+		commit_hash, _ := cmd.Flags().GetString("commit")
+		if cmd.Flags().Changed("merge-branch") {
+			merge_branch, _ := cmd.Flags().GetString("merge-branch")
+			diff, err = git.GetDiffWithMergeBase(commit_hash, merge_branch)
+		} else {
 			diff, err = git.GetDiffWithParent(commit_hash)
-			if err != nil {
-				fmt.Printf("Error getting diff with parent: %v\n", err)
-				return
-			}
 		}
 
-		if diff == "" {
-			fmt.Println("No diff found. Please provide a commit hash or ensure there are changes to summarize.")
+		if err != nil {
+			fmt.Printf("Error getting diff with parent: %v\n", err)
 			return
 		}
 
@@ -106,6 +96,5 @@ func init() {
 	summarizeCmd.Flags().StringP("model", "m", "gpt-4o", "LLM model to use for summarization")
 	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit (optional, uses current commit if not provided)")
 	summarizeCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
-	// summarizeCmd.Flags().StringP("pr", "p", "", "Pull request URL or ID to review")
-	// summarizeCmd.Flags().StringP("branch", "b", "", "Branch to review")
+	summarizeCmd.Flags().StringP("merge-branch", "b", "", "Branch to merge with (optional, uses current branch if not provided)")
 }
