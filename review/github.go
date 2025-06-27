@@ -3,8 +3,10 @@ package review
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
 )
@@ -54,23 +56,65 @@ func (gh *GitHub) PostReview(req ReviewRequest) ReviewResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
-	// First, add the summary as a PR comment
-	comment := &github.IssueComment{
-		Body: &req.Summary,
-	}
+	// Check for existing comments with the header "#file:summary.go"
+	summary := common.Summary{}
+	existingCommentID := 0
 
-	_, _, err := gh.client.Issues.CreateComment(
+	comments, _, err := gh.client.Issues.ListComments(
 		ctx,
 		req.RepoOwner(),
 		req.RepoName(),
 		req.PRNumber,
-		comment,
+		nil,
 	)
-
 	if err != nil {
 		return ReviewResponse{
 			Success: false,
-			Error:   fmt.Errorf("failed to post summary comment: %w", err),
+			Error:   fmt.Errorf("failed to list existing comments: %w", err),
+		}
+	}
+
+	// Look for an existing comment with our header
+	for _, c := range comments {
+		if c.Body != nil && strings.HasPrefix(*c.Body, summary.Header()) {
+			existingCommentID = int(*c.ID)
+			break
+		}
+	}
+
+	comment := &github.IssueComment{
+		Body: &req.Summary,
+	}
+
+	if existingCommentID > 0 {
+		_, _, err = gh.client.Issues.EditComment(
+			ctx,
+			req.RepoOwner(),
+			req.RepoName(),
+			int64(existingCommentID),
+			comment,
+		)
+
+		if err != nil {
+			return ReviewResponse{
+				Success: false,
+				Error:   fmt.Errorf("failed to update existing summary comment: %w", err),
+			}
+		}
+	} else {
+		_, _, err = gh.client.Issues.CreateComment(
+			ctx,
+			req.RepoOwner(),
+			req.RepoName(),
+			req.PRNumber,
+			comment,
+		)
+
+		if err != nil {
+			return ReviewResponse{
+				Success: false,
+				Error:   fmt.Errorf("failed to post summary comment: %w", err),
+			}
 		}
 	}
 
