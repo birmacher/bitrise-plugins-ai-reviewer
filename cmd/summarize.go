@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/llm"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/prompt"
@@ -62,10 +64,6 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("")
-		fmt.Println("Response from LLM:")
-		fmt.Println(resp.Content)
-
 		// Send to the review provider
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		if codeReviewerName != "" {
@@ -82,11 +80,18 @@ var summarizeCmd = &cobra.Command{
 				return
 			}
 
+			summary := common.Summary{}
+			err = json.Unmarshal([]byte(resp.Content), &summary)
+			if err != nil {
+				fmt.Printf("Error parsing response: %v\n", err)
+				return
+			}
+
 			request := review.ReviewRequest{
 				Repository: repo,
 				PRNumber:   pr,
 				Comments:   []review.Comment{},
-				Summary:    fmt.Sprintf("%s\n## Summary\n%s", review.SummaryHeader(pr), resp.Content),
+				Summary:    summary.String(),
 			}
 			response := gitProvider.PostReview(request)
 			if response.Error != nil {
