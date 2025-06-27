@@ -26,3 +26,5 @@ vendor/
 
 # Go workspace file
 go.work
+
+bitrise-plugins-ai-reviewer
