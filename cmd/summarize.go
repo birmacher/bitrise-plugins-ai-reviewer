@@ -71,7 +71,7 @@ func init() {
 
 	// Add flags specific to review command
 	summarizeCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
-	summarizeCmd.Flags().StringP("model", "m", "gpt-4o", "LLM model to use for summarization")
+	summarizeCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
 	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
 	summarizeCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
 	summarizeCmd.Flags().StringP("branch", "b", "", "Target Branch to merge with")
