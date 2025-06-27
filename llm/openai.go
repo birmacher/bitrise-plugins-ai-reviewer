@@ -18,8 +18,6 @@ type OpenAIModel struct {
 }
 
 // NewOpenAI creates a new OpenAI client
-// It requires an API key either from the OPENAI_API_KEY environment variable
-// or passed explicitly
 func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	model := &OpenAIModel{
 		apiKey:     apiKey,

@@ -69,7 +69,7 @@ type LLM interface {
 func getAPIKey() (string, error) {
 	apiKey := os.Getenv("LLM_API_KEY")
 	if apiKey == "" {
-		return "", fmt.Errorf("OPENAI_API_KEY environment variable is not set")
+		return "", fmt.Errorf("LLM_API_KEY environment variable is not set")
 	}
 	return apiKey, nil
 }
