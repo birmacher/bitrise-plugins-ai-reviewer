@@ -67,7 +67,7 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	fmt.Println("Using commit hash:", commitHash)
 
 	if targetBranch != "" {
-		fmt.Println("Using target branch for marge-base:", targetBranch)
+		fmt.Println("Using target branch for merge-base:", targetBranch)
 		return c.GetDiffWithMergeBase(commitHash, targetBranch, false)
 	}
 
