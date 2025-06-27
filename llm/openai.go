@@ -17,34 +17,10 @@ type OpenAIModel struct {
 	apiTimeout int // in seconds
 }
 
-// OpenAIOption is a function that configures the OpenAIModel
-type OpenAIOption func(*OpenAIModel)
-
-// WithModel sets the model name
-func WithModel(model string) OpenAIOption {
-	return func(o *OpenAIModel) {
-		o.modelName = model
-	}
-}
-
-// WithMaxTokens sets the max tokens
-func WithMaxTokens(maxTokens int) OpenAIOption {
-	return func(o *OpenAIModel) {
-		o.maxTokens = maxTokens
-	}
-}
-
-// WithAPITimeout sets the API timeout in seconds
-func WithAPITimeout(timeout int) OpenAIOption {
-	return func(o *OpenAIModel) {
-		o.apiTimeout = timeout
-	}
-}
-
 // NewOpenAI creates a new OpenAI client
 // It requires an API key either from the OPENAI_API_KEY environment variable
 // or passed explicitly
-func NewOpenAI(apiKey string, opts ...OpenAIOption) (*OpenAIModel, error) {
+func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	model := &OpenAIModel{
 		apiKey:     apiKey,
 		client:     openai.NewClient(apiKey),
@@ -55,7 +31,20 @@ func NewOpenAI(apiKey string, opts ...OpenAIOption) (*OpenAIModel, error) {
 
 	// Apply options
 	for _, opt := range opts {
-		opt(model)
+		switch opt.Type {
+		case ModelNameOption:
+			if modelName, ok := opt.Value.(string); ok {
+				model.modelName = modelName
+			}
+		case MaxTokensOption:
+			if maxTokens, ok := opt.Value.(int); ok {
+				model.maxTokens = maxTokens
+			}
+		case APITimeoutOption:
+			if timeout, ok := opt.Value.(int); ok {
+				model.apiTimeout = timeout
+			}
+		}
 	}
 
 	return model, nil

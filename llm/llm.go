@@ -7,6 +7,46 @@ import (
 
 const ProviderOpenAI = "openai"
 
+// OptionType defines the type of option
+type OptionType string
+
+// Available option types
+const (
+	ModelNameOption  OptionType = "model"
+	MaxTokensOption  OptionType = "max_tokens"
+	APITimeoutOption OptionType = "api_timeout"
+)
+
+// Option represents a generic configuration option for any LLM provider
+type Option struct {
+	Type  OptionType
+	Value any
+}
+
+// WithModel creates an option to set the model name
+func WithModel(model string) Option {
+	return Option{
+		Type:  ModelNameOption,
+		Value: model,
+	}
+}
+
+// WithMaxTokens creates an option to set the max tokens
+func WithMaxTokens(maxTokens int) Option {
+	return Option{
+		Type:  MaxTokensOption,
+		Value: maxTokens,
+	}
+}
+
+// WithAPITimeout creates an option to set the API timeout in seconds
+func WithAPITimeout(timeout int) Option {
+	return Option{
+		Type:  APITimeoutOption,
+		Value: timeout,
+	}
+}
+
 // Request represents the data needed to generate a prompt for the LLM
 type Request struct {
 	SystemPrompt string
@@ -57,7 +97,7 @@ func NewLLM(providerName, modelName string, opts ...Option) (LLM, error) {
 		err = fmt.Errorf("unsupported provider: %s", providerName)
 	}
 
-	if err != nil {
+	if err == nil {
 		fmt.Println("")
 		fmt.Println("Using LLM Provider:", providerName)
 		fmt.Println("With Model:", modelName)
