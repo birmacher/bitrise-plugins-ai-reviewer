@@ -3,7 +3,6 @@ package llm
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
@@ -46,20 +45,12 @@ func WithAPITimeout(timeout int) OpenAIOption {
 // It requires an API key either from the OPENAI_API_KEY environment variable
 // or passed explicitly
 func NewOpenAI(apiKey string, opts ...OpenAIOption) (*OpenAIModel, error) {
-	// Use environment variable if apiKey is not provided
-	if apiKey == "" {
-		apiKey = os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
-			return nil, fmt.Errorf("OpenAI API key is required")
-		}
-	}
-
 	model := &OpenAIModel{
+		apiKey:     apiKey,
 		client:     openai.NewClient(apiKey),
 		modelName:  "gpt-4o-mini", // Default model
 		maxTokens:  4000,          // Default max tokens
-		apiKey:     apiKey,
-		apiTimeout: 30, // Default timeout in seconds
+		apiTimeout: 30,            // Default timeout in seconds
 	}
 
 	// Apply options

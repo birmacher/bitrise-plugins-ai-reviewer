@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/llm"
@@ -17,40 +16,15 @@ var summarizeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Running AI code review...")
 
-		// Get API key from environment
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
-			fmt.Println("OPENAI_API_KEY environment variable not set")
-			return
-		}
-
 		// Get provider flag
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		var llmClient llm.LLM
-		var err error
-		switch provider {
-		case "openai":
-			// Create a new OpenAI model
-			llmClient, err = llm.NewOpenAI(apiKey,
-				llm.WithModel(model),
-				llm.WithMaxTokens(4000),
-				llm.WithAPITimeout(60),
-			)
-		default:
-			fmt.Printf("Unsupported provider: %s\n", provider)
-			return
-		}
-
+		llmClient, err := llm.NewLLM(provider, model)
 		if err != nil {
 			fmt.Printf("Failed to create Client for LLM Provider: %v\n", err)
 			return
 		}
-
-		fmt.Println("")
-		fmt.Println("Using LLM Provider:", provider)
-		fmt.Println("With Model:", model)
 
 		git := git.NewClient(git.NewDefaultRunner("."))
 		diff := ""
