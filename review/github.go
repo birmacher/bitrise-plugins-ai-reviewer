@@ -51,13 +51,8 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	return gh, nil
 }
 
-func (gh *GitHub) PostSummary(header string, req ReviewRequest) ReviewResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
-	defer cancel()
-
+func (gh *GitHub) getComment(ctx context.Context, header string, req ReviewRequest) (int64, error) {
 	// Check if summary already exists
-	existingCommentID := 0
-
 	comments, _, err := gh.client.Issues.ListComments(
 		ctx,
 		req.RepoOwner(),
@@ -66,17 +61,27 @@ func (gh *GitHub) PostSummary(header string, req ReviewRequest) ReviewResponse {
 		nil,
 	)
 	if err != nil {
-		return ReviewResponse{
-			Success: false,
-			Error:   fmt.Errorf("failed to list existing comments: %w", err),
+		return 0, err
+	}
+
+	for _, c := range comments {
+		if c.Body != nil && strings.HasPrefix(*c.Body, header) {
+			return *c.ID, nil
 		}
 	}
 
-	// Look for an existing comment with our header
-	for _, c := range comments {
-		if c.Body != nil && strings.HasPrefix(*c.Body, header) {
-			existingCommentID = int(*c.ID)
-			break
+	return 0, nil
+}
+
+func (gh *GitHub) PostSummary(header string, req ReviewRequest) ReviewResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	defer cancel()
+
+	commentID, err := gh.getComment(ctx, header, req)
+	if err != nil {
+		return ReviewResponse{
+			Success: false,
+			Error:   fmt.Errorf("failed to check existing comments: %w", err),
 		}
 	}
 
@@ -84,12 +89,12 @@ func (gh *GitHub) PostSummary(header string, req ReviewRequest) ReviewResponse {
 		Body: &req.Summary,
 	}
 
-	if existingCommentID > 0 {
+	if commentID > 0 {
 		_, _, err = gh.client.Issues.EditComment(
 			ctx,
 			req.RepoOwner(),
 			req.RepoName(),
-			int64(existingCommentID),
+			int64(commentID),
 			comment,
 		)
 
