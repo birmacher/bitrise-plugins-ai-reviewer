@@ -86,7 +86,7 @@ var summarizeCmd = &cobra.Command{
 				Repository: repo,
 				PRNumber:   pr,
 				Comments:   []review.Comment{},
-				Summary:    resp.Content,
+				Summary:    fmt.Sprintf("%s\n## Summary\n%s", review.SummaryHeader(pr), resp.Content),
 			}
 			response := gitProvider.PostReview(request)
 			if response.Error != nil {

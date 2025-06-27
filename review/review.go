@@ -75,6 +75,10 @@ func (r ReviewRequest) RepoName() string {
 	return ""
 }
 
+func SummaryHeader(pr int) string {
+	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: Summary for #%d -->", pr)
+}
+
 // ReviewResponse represents the response from the review provider
 type ReviewResponse struct {
 	Success bool
