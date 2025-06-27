@@ -120,6 +120,11 @@ func (c *Client) getCommitHash(commitHash string) (string, error) {
 func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
 	params := []string{
 		"diff",
+		"--no-color",
+		"--no-ext-diff",
+		"--diff-algorithm=minimal",
+		"--find-renames=90%",
+		"-U0",
 		commitRange,
 	}
 	if fileOnly {
