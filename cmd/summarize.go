@@ -6,6 +6,7 @@ import (
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/llm"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/prompt"
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/review"
 	"github.com/spf13/cobra"
 )
 
@@ -63,16 +64,49 @@ var summarizeCmd = &cobra.Command{
 		fmt.Println("")
 		fmt.Println("Response from LLM:")
 		fmt.Println(resp.Content)
+
+		// Send to the review provider
+		codeReviewerName, _ := cmd.Flags().GetString("code-review")
+		if codeReviewerName != "" {
+			gitProvider, err := review.NewReviewer(codeReviewerName)
+			if err != nil {
+				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
+				return
+			}
+
+			repo, _ := cmd.Flags().GetString("repo")
+			pr, _ := cmd.Flags().GetInt("pr")
+
+			request := review.ReviewRequest{
+				Repository: repo,
+				PRNumber:   pr,
+				Comments:   []review.Comment{},
+				Summary:    resp.Content,
+			}
+			response := gitProvider.PostReview(request)
+			if response.Error != nil {
+				fmt.Printf("Error posting review: %v\n", response.Error)
+				return
+			}
+
+			fmt.Println("Review posted: ", response.URL)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(summarizeCmd)
 
-	// Add flags specific to review command
+	// LLM
 	summarizeCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
 	summarizeCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
+	// Git
 	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
 	summarizeCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
 	summarizeCmd.Flags().StringP("branch", "b", "", "Target Branch to merge with")
+	// Code Review
+	summarizeCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
+	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
+	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
+
 }
