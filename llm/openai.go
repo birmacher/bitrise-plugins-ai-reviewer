@@ -83,10 +83,6 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		Content: req.UserPrompt,
 	})
 
-	fmt.Println()
-	fmt.Println("Message:")
-	fmt.Println(messages)
-
 	// Create the completion request
 	chatReq := openai.ChatCompletionRequest{
 		Model:       o.modelName,

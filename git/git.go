@@ -58,18 +58,12 @@ func NewClient(runner Runner) *Client {
 
 func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	fmt.Println("")
+	fmt.Println("Generating diff...")
 
-	if commitHash == "" {
-		fmt.Println("No commit hash provided, fetching current commit hash...")
-
-		ch, err := c.GetCurrentCommitHash()
-		if err != nil {
-			return "", fmt.Errorf("error getting current commit hash: %w", err)
-		}
-
-		commitHash = ch
+	commitHash, err := c.getCommitHash(commitHash)
+	if err != nil {
+		return "", fmt.Errorf("error getting commit hash: %w", err)
 	}
-
 	fmt.Println("Using commit hash:", commitHash)
 
 	if targetBranch != "" {
@@ -80,42 +74,15 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	return c.GetDiffWithParent(commitHash, false)
 }
 
-// GetChangedFilesForCommit returns a list of files changed in the given commit or compared to the merge base
-func (c *Client) getChangedFilesForCommit(commitHash, targetBranch string) ([]string, error) {
-	fmt.Println("")
-
-	if commitHash == "" {
-		fmt.Println("No commit hash provided for changed files, fetching current commit hash...")
-
-		ch, err := c.GetCurrentCommitHash()
-		if err != nil {
-			return nil, fmt.Errorf("error getting current commit hash: %w", err)
-		}
-
-		commitHash = ch
-	}
-
-	fmt.Println("Getting changed files for commit:", commitHash)
-
-	var diff string
-	var err error
-
-	if targetBranch != "" {
-		fmt.Println("Using target branch for merge-base comparison:", targetBranch)
-		diff, err = c.GetDiffWithMergeBase(commitHash, targetBranch, true)
-	} else {
-		diff, err = c.GetDiffWithParent(commitHash, true)
-	}
-
-	if err != nil {
-		return []string{}, fmt.Errorf("error getting changed files: %w", err)
-	}
-
-	return strings.Split(diff, "\n"), nil
-}
-
 func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error) {
 	fmt.Println("")
+	fmt.Println("Generating file contents...")
+
+	commitHash, err := c.getCommitHash(commitHash)
+	if err != nil {
+		return "", fmt.Errorf("error getting commit hash: %w", err)
+	}
+	fmt.Println("Using commit hash:", commitHash)
 
 	files, err := c.getChangedFilesForCommit(commitHash, targetBranch)
 	if err != nil {
@@ -124,14 +91,30 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 
 	fileOutput := []string{}
 	for _, filePath := range files {
-		output, err := c.GetFileContent(commitHash, filePath)
+		fmt.Println(" -> Processing file:", filePath)
+		output, err := c.getFileContent(commitHash, filePath)
 		if err != nil {
-			return "", fmt.Errorf("error getting file content for %s: %w", filePath, err)
+			return "", err
 		}
 		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s=====\n%s", filePath, output))
 	}
 
 	return strings.Join(fileOutput, "\n\n"), nil
+}
+
+func (c *Client) getCommitHash(commitHash string) (string, error) {
+	if commitHash == "" {
+		fmt.Println("No commit hash provided, fetching current commit hash...")
+		ch, err := c.GetCurrentCommitHash()
+
+		if err != nil {
+			return "", err
+		}
+
+		commitHash = ch
+	}
+
+	return commitHash, nil
 }
 
 func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
@@ -192,7 +175,7 @@ func (c *Client) GetChangedFiles(from, to string) ([]string, error) {
 	return strings.Split(output, "\n"), nil
 }
 
-func (c *Client) GetFileContent(commitHash, filePath string) (string, error) {
+func (c *Client) getFileContent(commitHash, filePath string) (string, error) {
 	if commitHash == "" || filePath == "" {
 		return "", errors.New("commit hash and file path cannot be empty")
 	}
@@ -203,4 +186,23 @@ func (c *Client) GetFileContent(commitHash, filePath string) (string, error) {
 	}
 
 	return output, nil
+}
+
+// GetChangedFilesForCommit returns a list of files changed in the given commit or compared to the merge base
+func (c *Client) getChangedFilesForCommit(commitHash, targetBranch string) ([]string, error) {
+	var diff string
+	var err error
+
+	if targetBranch != "" {
+		fmt.Println("Using target branch for merge-base comparison:", targetBranch)
+		diff, err = c.GetDiffWithMergeBase(commitHash, targetBranch, true)
+	} else {
+		diff, err = c.GetDiffWithParent(commitHash, true)
+	}
+
+	if err != nil {
+		return []string{}, fmt.Errorf("error getting changed files: %w", err)
+	}
+
+	return strings.Split(diff, "\n"), nil
 }
