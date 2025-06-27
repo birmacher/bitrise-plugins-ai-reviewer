@@ -56,6 +56,30 @@ func NewClient(runner Runner) *Client {
 	}
 }
 
+func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
+	fmt.Println("")
+
+	if commitHash == "" {
+		fmt.Println("No commit hash provided, fetching current commit hash...")
+
+		ch, err := c.GetCurrentCommitHash()
+		if err != nil {
+			return "", fmt.Errorf("error getting current commit hash: %w", err)
+		}
+
+		commitHash = ch
+	}
+
+	fmt.Println("Using commit hash:", commitHash)
+
+	if targetBranch != "" {
+		fmt.Println("Using target branch for marge-base:", targetBranch)
+		return c.GetDiffWithMergeBase(commitHash, targetBranch)
+	}
+
+	return c.GetDiffWithParent(commitHash)
+}
+
 // GetDiffWithParent returns the diff between the current commit and its parent
 func (c *Client) GetDiffWithParent(commitHash string) (string, error) {
 	if commitHash == "" {

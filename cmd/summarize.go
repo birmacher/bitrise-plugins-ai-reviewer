@@ -26,16 +26,11 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
-		git := git.NewClient(git.NewDefaultRunner("."))
-		diff := ""
+		commitHash, _ := cmd.Flags().GetString("commit")
+		targetBranch, _ := cmd.Flags().GetString("branch")
 
-		commit_hash, _ := cmd.Flags().GetString("commit")
-		if cmd.Flags().Changed("merge-branch") {
-			merge_branch, _ := cmd.Flags().GetString("merge-branch")
-			diff, err = git.GetDiffWithMergeBase(commit_hash, merge_branch)
-		} else {
-			diff, err = git.GetDiffWithParent(commit_hash)
-		}
+		git := git.NewClient(git.NewDefaultRunner("."))
+		diff, err := git.GetDiff(commitHash, targetBranch)
 
 		if err != nil {
 			fmt.Printf("Error getting diff with parent: %v\n", err)
@@ -68,7 +63,7 @@ func init() {
 	// Add flags specific to review command
 	summarizeCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
 	summarizeCmd.Flags().StringP("model", "m", "gpt-4o", "LLM model to use for summarization")
-	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit (optional, uses current commit if not provided)")
+	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
 	summarizeCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
-	summarizeCmd.Flags().StringP("merge-branch", "b", "", "Branch to merge with (optional, uses current branch if not provided)")
+	summarizeCmd.Flags().StringP("branch", "b", "", "Target Branch to merge with")
 }
