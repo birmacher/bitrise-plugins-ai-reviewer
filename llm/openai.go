@@ -22,9 +22,9 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	model := &OpenAIModel{
 		apiKey:     apiKey,
 		client:     openai.NewClient(apiKey),
-		modelName:  "gpt-4o-mini", // Default model
-		maxTokens:  4000,          // Default max tokens
-		apiTimeout: 30,            // Default timeout in seconds
+		modelName:  "gpt-4.1", // Default model
+		maxTokens:  4000,      // Default max tokens
+		apiTimeout: 30,        // Default timeout in seconds
 	}
 
 	// Apply options

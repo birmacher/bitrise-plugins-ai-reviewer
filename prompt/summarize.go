@@ -7,9 +7,12 @@ func GetSummarizePrompt() string {
 specific files within 80 words.
 - **Walkthrough**: A markdown table of files and their summaries. Group files 
 with similar changes together into a single row to save space.
+- **Line Feedback**: A list of specific line feedback, with each item containing:
+file name, line number, and a short description of the issue. You can include code suggestions
+if you are confident in your suggestions.
 - **Haiku**: Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
 Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.
 
 Avoid additional commentary as this summary will be added as a comment on the 
-GitHub pull request. Use the title "Summary", "Walkthrough", "Haiku" and it must be H2.`
+GitHub pull request. Use the json keys as "summary", "walkthrough", "line-feedback", "haiku".`
 }
