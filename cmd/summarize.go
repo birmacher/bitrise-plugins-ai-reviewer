@@ -16,7 +16,7 @@ var summarizeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Running AI code review...")
 
-		// Get provider flag
+		// Setup LLM client
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
@@ -26,6 +26,7 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
+		// Get git diff
 		commitHash, _ := cmd.Flags().GetString("commit")
 		targetBranch, _ := cmd.Flags().GetString("branch")
 
@@ -37,11 +38,19 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
-		// Create a request
+		// Get the file contents
+		fileContent, err := git.GetFileContents(commitHash, targetBranch)
+		if err != nil {
+			fmt.Printf("Error getting file contents: %v\n", err)
+			return
+		}
+
+		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(),
 			UserPrompt:   prompt.GetSummarizePrompt(),
 			Diff:         prompt.GetDiffPrompt(diff),
+			FileContents: prompt.GetFileContentPrompt(fileContent),
 		}
 
 		// Send the prompt and get the response

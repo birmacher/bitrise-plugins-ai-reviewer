@@ -7,3 +7,9 @@ func GetDiffPrompt(diffContent string) string {
 ` + diffContent + `
 [PR Diff End]`
 }
+
+func GetFileContentPrompt(fileContents string) string {
+	return `Here is the full content of the changed files for better context:
+
+` + fileContents
+}

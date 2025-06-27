@@ -69,11 +69,23 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		})
 	}
 
+	// Add file contents if available
+	if req.FileContents != "" {
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: req.FileContents,
+		})
+	}
+
 	// Add user prompt
 	messages = append(messages, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
 		Content: req.UserPrompt,
 	})
+
+	fmt.Println()
+	fmt.Println("Message:")
+	fmt.Println(messages)
 
 	// Create the completion request
 	chatReq := openai.ChatCompletionRequest{

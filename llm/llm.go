@@ -52,6 +52,7 @@ type Request struct {
 	SystemPrompt string
 	UserPrompt   string
 	Diff         string
+	FileContents string
 }
 
 // Response represents the response from the LLM
