@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/llm"
@@ -73,9 +74,13 @@ var summarizeCmd = &cobra.Command{
 				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
 				return
 			}
-
 			repo, _ := cmd.Flags().GetString("repo")
-			pr, _ := cmd.Flags().GetInt("pr")
+			prStr, _ := cmd.Flags().GetString("pr")
+			pr, err := strconv.Atoi(prStr)
+			if err != nil {
+				fmt.Printf("Invalid PR number: %v\n", err)
+				return
+			}
 
 			request := review.ReviewRequest{
 				Repository: repo,
