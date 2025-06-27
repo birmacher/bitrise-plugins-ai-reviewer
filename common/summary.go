@@ -22,6 +22,13 @@ func (s Summary) String() string {
 		"## Haiku\n" + s.Haiku
 }
 
+func (s Summary) InitiatedString() string {
+	return s.Header() + "\n" +
+		"## Summary\n" + s.Summary + "\n\n" +
+		"Reviewing the PR\n\n" +
+		"![](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYWplN3oxMjV0NDc0bW1lazBreGpibHRsZW40emFvZTMydTY2Mjg2bCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/7NoNw4pMNTvgc/200w.gif)\n\n"
+}
+
 func formatWalkthrough(walkthrough []Walkthrough) string {
 	result := "| File | Summary |\n"
 	result += "|------|---------|\n"

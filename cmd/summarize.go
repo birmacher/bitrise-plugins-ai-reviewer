@@ -20,14 +20,33 @@ var summarizeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Running AI code review...")
 
-		// Setup LLM client
-		provider, _ := cmd.Flags().GetString("provider")
-		model, _ := cmd.Flags().GetString("model")
-
-		llmClient, err := llm.NewLLM(provider, model)
+		codeReviewerName, _ := cmd.Flags().GetString("code-review")
+		repo, _ := cmd.Flags().GetString("repo")
+		prStr, _ := cmd.Flags().GetString("pr")
+		pr, err := strconv.Atoi(prStr)
 		if err != nil {
-			fmt.Printf("Failed to create Client for LLM Provider: %v\n", err)
+			fmt.Printf("Invalid PR number: %v\n", err)
 			return
+		}
+
+		if codeReviewerName != "" {
+			gitProvider, err := review.NewReviewer(codeReviewerName)
+			if err != nil {
+				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
+				return
+			}
+
+			request := review.ReviewRequest{
+				Repository: repo,
+				PRNumber:   pr,
+				Comments:   []review.Comment{},
+				Summary:    common.Summary{}.InitiatedString(),
+			}
+			response := gitProvider.PostSummary(common.Summary{}.Header(), request)
+			if response.Error != nil {
+				fmt.Printf("Error posting review: %v\n", response.Error)
+				return
+			}
 		}
 
 		// Get git diff
@@ -49,6 +68,16 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
+		// Setup LLM client
+		provider, _ := cmd.Flags().GetString("provider")
+		model, _ := cmd.Flags().GetString("model")
+
+		llmClient, err := llm.NewLLM(provider, model)
+		if err != nil {
+			fmt.Printf("Failed to create Client for LLM Provider: %v\n", err)
+			return
+		}
+
 		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(),
@@ -65,18 +94,10 @@ var summarizeCmd = &cobra.Command{
 		}
 
 		// Send to the review provider
-		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		if codeReviewerName != "" {
 			gitProvider, err := review.NewReviewer(codeReviewerName)
 			if err != nil {
 				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
-				return
-			}
-			repo, _ := cmd.Flags().GetString("repo")
-			prStr, _ := cmd.Flags().GetString("pr")
-			pr, err := strconv.Atoi(prStr)
-			if err != nil {
-				fmt.Printf("Invalid PR number: %v\n", err)
 				return
 			}
 
@@ -93,7 +114,7 @@ var summarizeCmd = &cobra.Command{
 				Comments:   []review.Comment{},
 				Summary:    summary.String(),
 			}
-			response := gitProvider.PostReview(request)
+			response := gitProvider.PostSummary(summary.Header(), request)
 			if response.Error != nil {
 				fmt.Printf("Error posting review: %v\n", response.Error)
 				return

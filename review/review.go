@@ -84,7 +84,7 @@ type ReviewResponse struct {
 
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
-	// PostReview submits review comments to the specified PR
+	PostSummary(header string, req ReviewRequest) ReviewResponse
 	PostReview(req ReviewRequest) ReviewResponse
 }
 
