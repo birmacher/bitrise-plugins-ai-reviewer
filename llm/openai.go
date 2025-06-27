@@ -61,6 +61,12 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		},
 	}
 
+	// Add user prompt
+	messages = append(messages, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: req.UserPrompt,
+	})
+
 	// Add diff if available
 	if req.Diff != "" {
 		messages = append(messages, openai.ChatCompletionMessage{
@@ -76,12 +82,6 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 			Content: req.FileContents,
 		})
 	}
-
-	// Add user prompt
-	messages = append(messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: req.UserPrompt,
-	})
 
 	// Create the completion request
 	chatReq := openai.ChatCompletionRequest{
