@@ -162,7 +162,6 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	if len(reviewComments) > 0 {
 		overallReview := "This is an AI-generated review. Please review it carefully."
 
-		fmt.Println("Posting line feedback to PR for commit", commitHash)
 		review := &github.PullRequestReviewRequest{
 			CommitID: &commitHash,
 			Body:     &overallReview,
