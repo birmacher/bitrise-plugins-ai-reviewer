@@ -3,15 +3,7 @@ description: |-
   Bitrise plugin for reviewing code using AI.
   
   This plugin uses AI to analyze code changes and provide feedback.
-version: 0.1.0
-
 executable:
-  osx: ./bin/ai-reviewer
-  linux: ./bin/ai-reviewer
-
-requirements:
-- tool: bitrise
-  min_version: 1.10.0
-  max_version: ""
-
-trigger: ""
+  osx: https://github.com/birmacher/bitrise-plugins-ai-reviewer/releases/download/0.1.0/bitrise-plugins-ai-reviewer-Darwin-x86_64
+  osx-arm64: https://github.com/birmacher/bitrise-plugins-ai-reviewer/releases/download/0.1.0/bitrise-plugins-ai-reviewer-Darwin-arm64
+  linux: https://github.com/birmacher/bitrise-plugins-ai-reviewer/releases/download/0.1.0/bitrise-plugins-ai-reviewer-Linux-x86_64
