@@ -8,8 +8,8 @@ import (
 type LineLevel struct {
 	File           string `json:"file"`
 	Line           string `json:"content"`
-	LineNumber     int
-	LastLineNumber int
+	LineNumber     int    `json:"line"`
+	LastLineNumber int    `json:"last_line"`
 	Body           string `json:"issue"`
 }
 
@@ -38,5 +38,6 @@ func (l LineLevel) FirstLine() string {
 }
 
 func (l LineLevel) LastLine() string {
-	return strings.Split(l.Line, "\n")[len(strings.Split(l.Line, "\n"))-1]
+	lines := strings.Split(l.Line, "\n")
+	return lines[len(lines)-1]
 }

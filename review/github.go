@@ -150,7 +150,7 @@ func (gh *GitHub) PostLineFeedback(repoOwner, repoName string, pr int, lineFeedb
 			Line: &ll.LineNumber,
 			Body: &reviewBody,
 		}
-		if ll.LastLineNumber > 0 {
+		if ll.LastLineNumber > 0 && ll.LastLineNumber > ll.LineNumber {
 			reviewComment.StartLine = &ll.LineNumber
 			reviewComment.Line = &ll.LastLineNumber
 			reviewComment.Side = github.String("RIGHT")
