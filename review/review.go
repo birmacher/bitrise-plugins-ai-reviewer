@@ -3,7 +3,8 @@ package review
 import (
 	"fmt"
 	"os"
-	"strings"
+
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
 )
 
 const (
@@ -44,48 +45,10 @@ func WithTimeout(timeout int) Option {
 	}
 }
 
-// Comment represents a review comment to be posted
-type Comment struct {
-	FilePath string
-	Line     int
-	Body     string
-}
-
-// ReviewRequest represents the data needed for a code review
-type ReviewRequest struct {
-	Repository string
-	PRNumber   int
-	Comments   []Comment
-	Summary    string
-}
-
-func (r ReviewRequest) RepoOwner() string {
-	parts := strings.Split(r.Repository, "/")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return ""
-}
-
-func (r ReviewRequest) RepoName() string {
-	parts := strings.Split(r.Repository, "/")
-	if len(parts) > 1 {
-		return parts[1]
-	}
-	return ""
-}
-
-// ReviewResponse represents the response from the review provider
-type ReviewResponse struct {
-	Success bool
-	URL     string // URL to the review, if applicable
-	Error   error
-}
-
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
-	PostSummary(header string, req ReviewRequest) ReviewResponse
-	PostReview(req ReviewRequest) ReviewResponse
+	PostSummary(repoOwner, repoName string, pr int, summary common.Summary) error
+	// PostLineFeedback(req ReviewRequest) error
 }
 
 // getAPIToken retrieves the API token from environment variables

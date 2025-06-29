@@ -1,5 +1,7 @@
 package common
 
+import "strings"
+
 type Walkthrough struct {
 	Files   string `json:"files"`   // List of files changed
 	Summary string `json:"summary"` // Summary of the changes
@@ -16,10 +18,22 @@ func (s Summary) Header() string {
 }
 
 func (s Summary) String() string {
-	return s.Header() + "\n" +
-		"## Summary\n" + s.Summary + "\n\n" +
-		"## Walkthrough\n" + formatWalkthrough(s.Walkthrough) + "\n\n" +
-		"## Haiku\n" + s.Haiku
+	if s.Summary == "" {
+		return s.InitiatedString()
+	}
+
+	summaryBody := []string{
+		s.Header(),
+		"## Summary\n" + s.Summary,
+	}
+	if len(s.Walkthrough) > 0 {
+		summaryBody = append(summaryBody, "## Walkthrough\n"+formatWalkthrough(s.Walkthrough))
+	}
+	if len(s.Haiku) > 0 {
+		summaryBody = append(summaryBody, "## Haiku\n"+s.Haiku)
+	}
+
+	return strings.Join(summaryBody, "\n\n")
 }
 
 func (s Summary) InitiatedString() string {

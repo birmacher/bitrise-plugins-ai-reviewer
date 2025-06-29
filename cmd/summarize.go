@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
@@ -22,6 +23,8 @@ var summarizeCmd = &cobra.Command{
 
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
+		repoOwner := strings.Split(repo, "/")[0]
+		repoName := strings.Split(repo, "/")[1]
 		prStr, _ := cmd.Flags().GetString("pr")
 		pr, err := strconv.Atoi(prStr)
 		if err != nil {
@@ -36,15 +39,9 @@ var summarizeCmd = &cobra.Command{
 				return
 			}
 
-			request := review.ReviewRequest{
-				Repository: repo,
-				PRNumber:   pr,
-				Comments:   []review.Comment{},
-				Summary:    common.Summary{}.InitiatedString(),
-			}
-			response := gitProvider.PostSummary(common.Summary{}.Header(), request)
-			if response.Error != nil {
-				fmt.Printf("Error posting review: %v\n", response.Error)
+			err = gitProvider.PostSummary(repoOwner, repoName, pr, common.Summary{})
+			if err != nil {
+				fmt.Printf("Error posting review: %v\n", err)
 				return
 			}
 		}
@@ -108,19 +105,28 @@ var summarizeCmd = &cobra.Command{
 				return
 			}
 
-			request := review.ReviewRequest{
-				Repository: repo,
-				PRNumber:   pr,
-				Comments:   []review.Comment{},
-				Summary:    summary.String(),
-			}
-			response := gitProvider.PostSummary(summary.Header(), request)
-			if response.Error != nil {
-				fmt.Printf("Error posting review: %v\n", response.Error)
+			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary)
+			if err != nil {
+				fmt.Printf("Error posting review: %v\n", err)
 				return
 			}
 
-			fmt.Println("Review posted: ", response.URL)
+			// lineLevel := common.LineLevelFeedback{}
+			// err = json.Unmarshal([]byte(resp.Content), &summary)
+			// if err != nil {
+			// 	fmt.Printf("Error parsing response: %v\n", err)
+			// 	return
+			// }
+
+			// err = gitProvider.PostLineFeedback(review.ReviewRequest{
+			// 	Repository: repo,
+			// 	PRNumber:   pr,
+			// 	DiffReview: summary.DiffReview,
+			// 	Summary:    summary.String(),
+			// 	Header:     summary.Header(),
+			// })
+
+			fmt.Println("Review posted: ")
 		}
 	},
 }

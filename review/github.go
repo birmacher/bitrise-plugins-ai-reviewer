@@ -51,194 +51,134 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	return gh, nil
 }
 
-func (gh *GitHub) getComment(ctx context.Context, header string, req ReviewRequest) (int64, error) {
-	// Check if summary already exists
+func (gh *GitHub) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]*github.IssueComment, error) {
 	comments, _, err := gh.client.Issues.ListComments(
 		ctx,
-		req.RepoOwner(),
-		req.RepoName(),
-		req.PRNumber,
+		repoOwner,
+		repoName,
+		pr,
 		nil,
 	)
-	if err != nil {
-		return 0, err
-	}
+	return comments, err
+}
 
+func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (int64, error) {
+	// Check if summary already exists
 	for _, c := range comments {
 		if c.Body != nil && strings.HasPrefix(*c.Body, header) {
 			return *c.ID, nil
 		}
 	}
-
 	return 0, nil
 }
 
-func (gh *GitHub) PostSummary(header string, req ReviewRequest) ReviewResponse {
+func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, summary common.Summary) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
-	commentID, err := gh.getComment(ctx, header, req)
+	comments, err := gh.getComments(ctx, repoOwner, repoName, pr)
 	if err != nil {
-		return ReviewResponse{
-			Success: false,
-			Error:   fmt.Errorf("failed to check existing comments: %w", err),
-		}
+		return fmt.Errorf("failed to list existing comments: %w", err)
 	}
 
+	commentID, err := gh.getComment(comments, summary.Header())
+	if err != nil {
+		return fmt.Errorf("failed to check existing comments: %w", err)
+	}
+
+	commentBody := summary.String()
 	comment := &github.IssueComment{
-		Body: &req.Summary,
+		Body: &commentBody,
 	}
 
 	if commentID > 0 {
 		_, _, err = gh.client.Issues.EditComment(
 			ctx,
-			req.RepoOwner(),
-			req.RepoName(),
+			repoOwner,
+			repoName,
 			int64(commentID),
 			comment,
 		)
 
 		if err != nil {
-			return ReviewResponse{
-				Success: false,
-				Error:   fmt.Errorf("failed to update existing summary comment: %w", err),
-			}
+			return fmt.Errorf("failed to update existing summary comment: %w", err)
 		}
 	} else {
 		_, _, err = gh.client.Issues.CreateComment(
 			ctx,
-			req.RepoOwner(),
-			req.RepoName(),
-			req.PRNumber,
+			repoOwner,
+			repoName,
+			pr,
 			comment,
 		)
 
 		if err != nil {
-			return ReviewResponse{
-				Success: false,
-				Error:   fmt.Errorf("failed to post summary comment: %w", err),
-			}
+			return fmt.Errorf("failed to post summary comment: %w", err)
 		}
 	}
 
-	prURL := fmt.Sprintf("https://github.com/%s/pull/%d", req.Repository, req.PRNumber)
-
-	return ReviewResponse{
-		Success: true,
-		URL:     prURL,
-		Error:   nil,
-	}
+	return nil
 }
 
-// PostReview submits review comments to GitHub PR
-func (gh *GitHub) PostReview(req ReviewRequest) ReviewResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
-	defer cancel()
+// func (gh *GitHub) PostLineFeedback(req ReviewRequest) error {
+// 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+// 	defer cancel()
 
-	// Check for existing comments with the header "#file:summary.go"
-	summary := common.Summary{}
-	existingCommentID := 0
+// 	// Check for existing comments
+// 	comments, err := gh.getComments(ctx, "", "", 0)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to list existing comments: %w", err)
+// 	}
 
-	comments, _, err := gh.client.Issues.ListComments(
-		ctx,
-		req.RepoOwner(),
-		req.RepoName(),
-		req.PRNumber,
-		nil,
-	)
-	if err != nil {
-		return ReviewResponse{
-			Success: false,
-			Error:   fmt.Errorf("failed to list existing comments: %w", err),
-		}
-	}
+// 	reviewComments := make([]*github.DraftReviewComment, 0)
 
-	// Look for an existing comment with our header
-	for _, c := range comments {
-		if c.Body != nil && strings.HasPrefix(*c.Body, summary.Header()) {
-			existingCommentID = int(*c.ID)
-			break
-		}
-	}
+// 	for _, review := range req.DiffReview {
+// 		ll := common.LineLevel{
+// 			File: review.FilePath,
+// 			Line: review.Line,
+// 		}
 
-	comment := &github.IssueComment{
-		Body: &req.Summary,
-	}
+// 		// todo git blame header
+// 		commentID, err := gh.getComment(comments, ll.Header("git blame"))
 
-	if existingCommentID > 0 {
-		_, _, err = gh.client.Issues.EditComment(
-			ctx,
-			req.RepoOwner(),
-			req.RepoName(),
-			int64(existingCommentID),
-			comment,
-		)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to check existing comments: %w", err)
+// 		}
 
-		if err != nil {
-			return ReviewResponse{
-				Success: false,
-				Error:   fmt.Errorf("failed to update existing summary comment: %w", err),
-			}
-		}
-	} else {
-		_, _, err = gh.client.Issues.CreateComment(
-			ctx,
-			req.RepoOwner(),
-			req.RepoName(),
-			req.PRNumber,
-			comment,
-		)
+// 		if commentID > 0 {
+// 			continue
+// 		}
 
-		if err != nil {
-			return ReviewResponse{
-				Success: false,
-				Error:   fmt.Errorf("failed to post summary comment: %w", err),
-			}
-		}
-	}
+// 		reviewBody := ll.String()
+// 		reviewComments = append(reviewComments, &github.DraftReviewComment{
+// 			Path:     &ll.File,
+// 			Position: &ll.Line,
+// 			Body:     &reviewBody,
+// 		})
+// 	}
 
-	// Then add review comments if any
-	if len(req.Comments) > 0 {
-		// Create review comments
-		comments := make([]*github.DraftReviewComment, 0, len(req.Comments))
+// 	if len(reviewComments) > 0 {
+// 		overallReview := "This is an AI-generated review. Please review it carefully."
 
-		for _, c := range req.Comments {
-			comments = append(comments, &github.DraftReviewComment{
-				Path:     &c.FilePath,
-				Body:     &c.Body,
-				Position: github.Int(c.Line),
-			})
-		}
+// 		review := &github.PullRequestReviewRequest{
+// 			CommitID: nil,
+// 			Body:     &overallReview,
+// 			Event:    github.String("COMMENT"),
+// 			Comments: reviewComments,
+// 		}
 
-		review := &github.PullRequestReviewRequest{
-			CommitID: nil, // Uses the latest commit
-			Body:     &req.Summary,
-			Event:    github.String("COMMENT"),
-			Comments: comments,
-		}
+// 		_, _, err = gh.client.PullRequests.CreateReview(
+// 			ctx,
+// 			req.RepoOwner(),
+// 			req.RepoName(),
+// 			req.PRNumber,
+// 			review,
+// 		)
 
-		_, _, err = gh.client.PullRequests.CreateReview(
-			ctx,
-			req.RepoOwner(),
-			req.RepoName(),
-			req.PRNumber,
-			review,
-		)
+// 		if err != nil {
+// 			return fmt.Errorf("failed to post line feedback: %w", err)
+// 		}
+// 	}
 
-		if err != nil {
-			return ReviewResponse{
-				Success: false,
-				Error:   fmt.Errorf("failed to post review comments: %w", err),
-			}
-		}
-	}
-
-	// Construct the PR URL
-	prURL := fmt.Sprintf("https://github.com/%s/pull/%d", req.Repository, req.PRNumber)
-
-	return ReviewResponse{
-		Success: true,
-		URL:     prURL,
-		Error:   nil,
-	}
-}
+// 	return nil
+// }
