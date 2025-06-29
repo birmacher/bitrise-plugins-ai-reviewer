@@ -107,7 +107,7 @@ func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNum
 		return "", errors.New("commit hash, file path and line number cannot be empty")
 	}
 
-	output, err := c.runner.Run("git", "blame", "-L", fmt.Sprintf("%d,%d", lineNumber, lineNumber), fmt.Sprintf("%s -- %s", commitHash, filePath))
+	output, err := c.runner.Run("git", "blame", "-L", fmt.Sprintf("%d,%d", lineNumber, lineNumber), commitHash, "--", filePath)
 	if err != nil {
 		return "", fmt.Errorf("error getting blame for file line: %w", err)
 	}
