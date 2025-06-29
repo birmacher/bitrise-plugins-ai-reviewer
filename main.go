@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/cmd"
+	_ "github.com/birmacher/bitrise-plugins-ai-reviewer/review"  // Import for PR review functionality
 	_ "github.com/birmacher/bitrise-plugins-ai-reviewer/version" // Import for version info
 )
 

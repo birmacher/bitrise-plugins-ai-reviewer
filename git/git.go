@@ -60,7 +60,7 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	fmt.Println("")
 	fmt.Println("Generating diff...")
 
-	commitHash, err := c.getCommitHash(commitHash)
+	commitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
 		return "", fmt.Errorf("error getting commit hash: %w", err)
 	}
@@ -78,7 +78,7 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 	fmt.Println("")
 	fmt.Println("Generating file contents...")
 
-	commitHash, err := c.getCommitHash(commitHash)
+	commitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
 		return "", fmt.Errorf("error getting commit hash: %w", err)
 	}
@@ -96,13 +96,30 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 		if err != nil {
 			return "", err
 		}
-		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s=====\n%s", filePath, output))
+		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s =====\n%s", filePath, output))
 	}
 
 	return strings.Join(fileOutput, "\n\n"), nil
 }
 
-func (c *Client) getCommitHash(commitHash string) (string, error) {
+func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNumber int) (string, error) {
+	if commitHash == "" || filePath == "" || lineNumber <= 0 {
+		return "", errors.New("commit hash, file path and line number cannot be empty")
+	}
+
+	output, err := c.runner.Run("git", "blame", "-L", fmt.Sprintf("%d,%d", lineNumber, lineNumber), commitHash, "--", filePath)
+	if err != nil {
+		return "", fmt.Errorf("error getting blame for file line: %w", err)
+	}
+
+	parts := strings.Split(output, " ")
+	if len(parts) < 2 {
+		return "", errors.New("invalid blame output")
+	}
+	return parts[0], nil
+}
+
+func (c *Client) GetCommitHash(commitHash string) (string, error) {
 	if commitHash == "" {
 		fmt.Println("No commit hash provided, fetching current commit hash...")
 		ch, err := c.GetCurrentCommitHash()

@@ -57,7 +57,7 @@ type Request struct {
 
 // Response represents the response from the LLM
 type Response struct {
-	Content string // Markdown formatted content
+	Content string
 	Error   error
 }
 
