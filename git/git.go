@@ -60,7 +60,7 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	fmt.Println("")
 	fmt.Println("Generating diff...")
 
-	commitHash, err := c.getCommitHash(commitHash)
+	commitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
 		return "", fmt.Errorf("error getting commit hash: %w", err)
 	}
@@ -78,7 +78,7 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 	fmt.Println("")
 	fmt.Println("Generating file contents...")
 
-	commitHash, err := c.getCommitHash(commitHash)
+	commitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
 		return "", fmt.Errorf("error getting commit hash: %w", err)
 	}
@@ -115,7 +115,7 @@ func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNum
 	return output, nil
 }
 
-func (c *Client) getCommitHash(commitHash string) (string, error) {
+func (c *Client) GetCommitHash(commitHash string) (string, error) {
 	if commitHash == "" {
 		fmt.Println("No commit hash provided, fetching current commit hash...")
 		ch, err := c.GetCurrentCommitHash()

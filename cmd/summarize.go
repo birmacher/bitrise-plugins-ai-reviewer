@@ -58,6 +58,13 @@ var summarizeCmd = &cobra.Command{
 		targetBranch, _ := cmd.Flags().GetString("branch")
 
 		git := git.NewClient(git.NewDefaultRunner("."))
+
+		commitHash, err = git.GetCommitHash(commitHash)
+		if err != nil {
+			fmt.Printf("Error getting commit hash: %v\n", err)
+			return
+		}
+
 		diff, err := git.GetDiff(commitHash, targetBranch)
 
 		if err != nil {
