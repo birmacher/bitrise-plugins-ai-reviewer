@@ -118,6 +118,25 @@ var summarizeCmd = &cobra.Command{
 				return
 			}
 
+			for idx, ll := range lineLevel.Lines {
+				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
+				if err != nil {
+					fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
+					continue
+				}
+				lineLevel.Lines[idx].LineNumber = lineNumber
+
+				if ll.IsMultiline() {
+					lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
+					if err != nil {
+						fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
+						continue
+					}
+					lineLevel.Lines[idx].LastLineNumber = lineNumber
+
+				}
+			}
+
 			err = gitProvider.PostLineFeedback(repoOwner, repoName, pr, lineLevel)
 			if err != nil {
 				fmt.Printf("Error posting line feedback: %v\n", err)

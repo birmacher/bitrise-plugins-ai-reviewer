@@ -7,8 +7,8 @@ func GetSummarizePrompt() string {
 specific files within 80 words.
 - **Walkthrough**: A markdown table of files and their summaries. Group files 
 with similar changes together into a single row to save space.
-- **Line Feedback**: A list of specific line feedback only for the added, or changed part of the diff, with each item containing:
-file name, line number (use the git diff header to identify the correct line number), and a short description of the issue.
+- **Line Feedback**: A list of issues found in the diff hunks. Return the file ("file"), issue ("issue") and the exact line content ("content") you are commenting on.
+Only include lines that appear in this diff hunk. Do not make up lines. Quote the entire target line exactly as it appears in the diff.
 Focus on bugs, smalls, security issues, and code quality improvements.
 - **Haiku**: Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
 Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.

@@ -96,7 +96,7 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 		if err != nil {
 			return "", err
 		}
-		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s=====\n%s", filePath, output))
+		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s =====\n%s", filePath, output))
 	}
 
 	return strings.Join(fileOutput, "\n\n"), nil

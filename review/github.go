@@ -145,11 +145,18 @@ func (gh *GitHub) PostLineFeedback(repoOwner, repoName string, pr int, lineFeedb
 		}
 
 		reviewBody := ll.String()
-		reviewComments = append(reviewComments, &github.DraftReviewComment{
-			Path:     &ll.File,
-			Position: &ll.Line,
-			Body:     &reviewBody,
-		})
+		reviewComment := &github.DraftReviewComment{
+			Path: &ll.File,
+			Line: &ll.LineNumber,
+			Body: &reviewBody,
+		}
+		if ll.LastLineNumber > 0 {
+			reviewComment.StartLine = &ll.LineNumber
+			reviewComment.Line = &ll.LastLineNumber
+			reviewComment.Side = github.String("RIGHT")
+		}
+
+		reviewComments = append(reviewComments, reviewComment)
 	}
 
 	if len(reviewComments) > 0 {
