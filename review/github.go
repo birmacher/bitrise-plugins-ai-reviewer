@@ -120,65 +120,60 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, summary common
 	return nil
 }
 
-// func (gh *GitHub) PostLineFeedback(req ReviewRequest) error {
-// 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
-// 	defer cancel()
+func (gh *GitHub) PostLineFeedback(repoOwner, repoName string, pr int, lineFeedback common.LineLevelFeedback) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	defer cancel()
 
-// 	// Check for existing comments
-// 	comments, err := gh.getComments(ctx, "", "", 0)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to list existing comments: %w", err)
-// 	}
+	// Check for existing comments
+	comments, err := gh.getComments(ctx, repoOwner, repoName, pr)
+	if err != nil {
+		return fmt.Errorf("failed to list existing comments: %w", err)
+	}
 
-// 	reviewComments := make([]*github.DraftReviewComment, 0)
+	reviewComments := make([]*github.DraftReviewComment, 0)
 
-// 	for _, review := range req.DiffReview {
-// 		ll := common.LineLevel{
-// 			File: review.FilePath,
-// 			Line: review.Line,
-// 		}
+	for _, ll := range lineFeedback.Lines {
+		// TODO: git blame header
+		commentID, err := gh.getComment(comments, ll.Header("git blame"))
 
-// 		// todo git blame header
-// 		commentID, err := gh.getComment(comments, ll.Header("git blame"))
+		if err != nil {
+			return fmt.Errorf("failed to check existing comments: %w", err)
+		}
 
-// 		if err != nil {
-// 			return fmt.Errorf("failed to check existing comments: %w", err)
-// 		}
+		if commentID > 0 {
+			continue
+		}
 
-// 		if commentID > 0 {
-// 			continue
-// 		}
+		reviewBody := ll.String()
+		reviewComments = append(reviewComments, &github.DraftReviewComment{
+			Path:     &ll.File,
+			Position: &ll.Line,
+			Body:     &reviewBody,
+		})
+	}
 
-// 		reviewBody := ll.String()
-// 		reviewComments = append(reviewComments, &github.DraftReviewComment{
-// 			Path:     &ll.File,
-// 			Position: &ll.Line,
-// 			Body:     &reviewBody,
-// 		})
-// 	}
+	if len(reviewComments) > 0 {
+		overallReview := "This is an AI-generated review. Please review it carefully."
 
-// 	if len(reviewComments) > 0 {
-// 		overallReview := "This is an AI-generated review. Please review it carefully."
+		review := &github.PullRequestReviewRequest{
+			CommitID: nil,
+			Body:     &overallReview,
+			Event:    github.String("COMMENT"),
+			Comments: reviewComments,
+		}
 
-// 		review := &github.PullRequestReviewRequest{
-// 			CommitID: nil,
-// 			Body:     &overallReview,
-// 			Event:    github.String("COMMENT"),
-// 			Comments: reviewComments,
-// 		}
+		_, _, err := gh.client.PullRequests.CreateReview(
+			ctx,
+			repoOwner,
+			repoName,
+			pr,
+			review,
+		)
 
-// 		_, _, err = gh.client.PullRequests.CreateReview(
-// 			ctx,
-// 			req.RepoOwner(),
-// 			req.RepoName(),
-// 			req.PRNumber,
-// 			review,
-// 		)
+		if err != nil {
+			return fmt.Errorf("failed to post line feedback: %w", err)
+		}
+	}
 
-// 		if err != nil {
-// 			return fmt.Errorf("failed to post line feedback: %w", err)
-// 		}
-// 	}
-
-// 	return nil
-// }
+	return nil
+}

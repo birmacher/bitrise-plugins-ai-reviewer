@@ -111,20 +111,18 @@ var summarizeCmd = &cobra.Command{
 				return
 			}
 
-			// lineLevel := common.LineLevelFeedback{}
-			// err = json.Unmarshal([]byte(resp.Content), &summary)
-			// if err != nil {
-			// 	fmt.Printf("Error parsing response: %v\n", err)
-			// 	return
-			// }
+			lineLevel := common.LineLevelFeedback{}
+			err = json.Unmarshal([]byte(resp.Content), &lineLevel)
+			if err != nil {
+				fmt.Printf("Error parsing response: %v\n", err)
+				return
+			}
 
-			// err = gitProvider.PostLineFeedback(review.ReviewRequest{
-			// 	Repository: repo,
-			// 	PRNumber:   pr,
-			// 	DiffReview: summary.DiffReview,
-			// 	Summary:    summary.String(),
-			// 	Header:     summary.Header(),
-			// })
+			err = gitProvider.PostLineFeedback(repoOwner, repoName, pr, lineLevel)
+			if err != nil {
+				fmt.Printf("Error posting line feedback: %v\n", err)
+				return
+			}
 
 			fmt.Println("Review posted: ")
 		}

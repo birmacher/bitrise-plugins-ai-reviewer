@@ -48,7 +48,7 @@ func WithTimeout(timeout int) Option {
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
 	PostSummary(repoOwner, repoName string, pr int, summary common.Summary) error
-	// PostLineFeedback(req ReviewRequest) error
+	PostLineFeedback(repoOwner, repoName string, pr int, lineFeedback common.LineLevelFeedback) error
 }
 
 // getAPIToken retrieves the API token from environment variables
