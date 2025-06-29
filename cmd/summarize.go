@@ -23,8 +23,15 @@ var summarizeCmd = &cobra.Command{
 
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
-		repoOwner := strings.Split(repo, "/")[0]
-		repoName := strings.Split(repo, "/")[1]
+
+		repoTags := strings.Split(repo, "/")
+		if len(repoTags) != 2 {
+			fmt.Println("Repository must be in the format 'owner/repo'")
+			return
+		}
+		repoOwner := repoTags[0]
+		repoName := repoTags[1]
+
 		prStr, _ := cmd.Flags().GetString("pr")
 		pr, err := strconv.Atoi(prStr)
 		if err != nil {
@@ -127,12 +134,15 @@ var summarizeCmd = &cobra.Command{
 				lineLevel.Lines[idx].LineNumber = lineNumber
 
 				if ll.IsMultiline() {
-					lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
+					lastLineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
 					if err != nil {
 						fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
 						continue
 					}
-					lineLevel.Lines[idx].LastLineNumber = lineNumber
+
+					if lastLineNumber > lineLevel.Lines[idx].LineNumber {
+						lineLevel.Lines[idx].LastLineNumber = lastLineNumber
+					}
 
 				}
 			}
