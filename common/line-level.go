@@ -31,8 +31,8 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: %s:%s:%s -->", l.File, lineNumber, gitBlame)
 }
 
-func (l LineLevel) String() string {
-	return l.Body
+func (l LineLevel) String(client *git.Client, commitHash string) string {
+	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), l.Body)
 }
 
 func (l LineLevel) IsMultiline() bool {
