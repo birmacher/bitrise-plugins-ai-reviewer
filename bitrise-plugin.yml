@@ -3,6 +3,7 @@ description: |-
   Bitrise plugin for reviewing code using AI.
   
   This plugin uses AI to analyze code changes and provide feedback.
+version: 0.1.0
 
 executable:
   osx: ./bin/ai-reviewer
