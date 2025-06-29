@@ -102,6 +102,19 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 	return strings.Join(fileOutput, "\n\n"), nil
 }
 
+func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNumber int) (string, error) {
+	if commitHash == "" || filePath == "" || lineNumber <= 0 {
+		return "", errors.New("commit hash, file path and line number cannot be empty")
+	}
+
+	output, err := c.runner.Run("git", "blame", "-L", fmt.Sprintf("%d,%d", lineNumber, lineNumber), fmt.Sprintf("%s:%s", commitHash, filePath))
+	if err != nil {
+		return "", fmt.Errorf("error getting blame for file line: %w", err)
+	}
+
+	return output, nil
+}
+
 func (c *Client) getCommitHash(commitHash string) (string, error) {
 	if commitHash == "" {
 		fmt.Println("No commit hash provided, fetching current commit hash...")

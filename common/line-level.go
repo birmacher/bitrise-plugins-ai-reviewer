@@ -3,6 +3,8 @@ package common
 import (
 	"fmt"
 	"strings"
+
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 )
 
 type LineLevel struct {
@@ -17,12 +19,16 @@ type LineLevelFeedback struct {
 	Lines []LineLevel `json:"line-feedback"`
 }
 
-func (l LineLevel) Header(gitblame string) string {
+func (l LineLevel) Header(client *git.Client, commitHash string) string {
 	lineNumber := fmt.Sprintf("%d", l.LineNumber)
 	if l.IsMultiline() {
 		lineNumber = fmt.Sprintf("%d-%d", l.LineNumber, l.LastLineNumber)
 	}
-	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: %s:%s:%s -->", l.File, lineNumber, gitblame)
+	gitBlame, err := client.GetBlameForFileLine(commitHash, l.File, l.LineNumber)
+	if err != nil {
+		gitBlame = "unknown"
+	}
+	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: %s:%s:%s -->", l.File, lineNumber, gitBlame)
 }
 
 func (l LineLevel) String() string {

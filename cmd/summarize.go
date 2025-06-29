@@ -147,13 +147,13 @@ var summarizeCmd = &cobra.Command{
 				}
 			}
 
-			err = gitProvider.PostLineFeedback(repoOwner, repoName, pr, lineLevel)
+			err = gitProvider.PostLineFeedback(git, repoOwner, repoName, pr, commitHash, lineLevel)
 			if err != nil {
 				fmt.Printf("Error posting line feedback: %v\n", err)
 				return
 			}
 
-			fmt.Println("Review posted: ")
+			fmt.Println("Review posted successfully!")
 		}
 	},
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 )
 
 const (
@@ -48,7 +49,7 @@ func WithTimeout(timeout int) Option {
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
 	PostSummary(repoOwner, repoName string, pr int, summary common.Summary) error
-	PostLineFeedback(repoOwner, repoName string, pr int, lineFeedback common.LineLevelFeedback) error
+	PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error
 }
 
 // getAPIToken retrieves the API token from environment variables

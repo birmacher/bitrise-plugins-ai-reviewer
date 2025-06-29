@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
+	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
 )
@@ -120,7 +121,7 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, summary common
 	return nil
 }
 
-func (gh *GitHub) PostLineFeedback(repoOwner, repoName string, pr int, lineFeedback common.LineLevelFeedback) error {
+func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
@@ -133,8 +134,7 @@ func (gh *GitHub) PostLineFeedback(repoOwner, repoName string, pr int, lineFeedb
 	reviewComments := make([]*github.DraftReviewComment, 0)
 
 	for _, ll := range lineFeedback.Lines {
-		// TODO: git blame header
-		commentID, err := gh.getComment(comments, ll.Header("git blame"))
+		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
 
 		if err != nil {
 			return fmt.Errorf("failed to check existing comments: %w", err)
@@ -163,7 +163,7 @@ func (gh *GitHub) PostLineFeedback(repoOwner, repoName string, pr int, lineFeedb
 		overallReview := "This is an AI-generated review. Please review it carefully."
 
 		review := &github.PullRequestReviewRequest{
-			CommitID: nil,
+			CommitID: &commitHash,
 			Body:     &overallReview,
 			Event:    github.String("COMMENT"),
 			Comments: reviewComments,
