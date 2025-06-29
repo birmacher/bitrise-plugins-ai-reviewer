@@ -39,8 +39,10 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
+		var gitProvider review.Reviewer
+
 		if codeReviewerName != "" {
-			gitProvider, err := review.NewReviewer(codeReviewerName)
+			gitProvider, err = review.NewReviewer(codeReviewerName)
 			if err != nil {
 				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
 				return
@@ -106,12 +108,6 @@ var summarizeCmd = &cobra.Command{
 
 		// Send to the review provider
 		if codeReviewerName != "" {
-			gitProvider, err := review.NewReviewer(codeReviewerName)
-			if err != nil {
-				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
-				return
-			}
-
 			summary := common.Summary{}
 			err = json.Unmarshal([]byte(resp.Content), &summary)
 			if err != nil {
