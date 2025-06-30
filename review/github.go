@@ -144,6 +144,10 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
+		if ll.File == "" || ll.LineNumber <= 0 {
+			continue
+		}
+
 		reviewBody := ll.String(client, commitHash)
 		reviewComment := &github.DraftReviewComment{
 			Path: &ll.File,
