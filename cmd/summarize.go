@@ -81,6 +81,12 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
+		reviewComments, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
+		if err != nil {
+			fmt.Printf("Error getting review comments: %v\n", err)
+			return
+		}
+
 		// Setup LLM client
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
@@ -93,10 +99,11 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(),
-			UserPrompt:   prompt.GetSummarizePrompt(),
-			Diff:         prompt.GetDiffPrompt(diff),
-			FileContents: prompt.GetFileContentPrompt(fileContent),
+			SystemPrompt:   prompt.GetSystemPrompt(),
+			UserPrompt:     prompt.GetSummarizePrompt(),
+			Diff:           prompt.GetDiffPrompt(diff),
+			FileContents:   prompt.GetFileContentPrompt(fileContent),
+			ReviewComments: prompt.GetLineLevelPrompt(reviewComments),
 		}
 
 		// Send the prompt and get the response
@@ -105,6 +112,8 @@ var summarizeCmd = &cobra.Command{
 			fmt.Printf("Error getting response: %v\n", resp.Error)
 			return
 		}
+
+		fmt.Println("LLM Response:\n", resp.Content)
 
 		// Send to the review provider
 		if codeReviewerName != "" {

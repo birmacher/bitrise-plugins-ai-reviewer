@@ -50,8 +50,7 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 
 // Prompt sends a request to OpenAI and returns the response
 func (o *OpenAIModel) Prompt(req Request) Response {
-	ctx, cancel := context.WithTimeout(context.Background(),
-		time.Duration(o.apiTimeout)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
 
 	messages := []openai.ChatCompletionMessage{
@@ -80,6 +79,14 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		messages = append(messages, openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
 			Content: req.FileContents,
+		})
+	}
+
+	// Add review comments if available
+	if req.ReviewComments != "" {
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: req.ReviewComments,
 		})
 	}
 

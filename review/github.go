@@ -184,3 +184,59 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 
 	return nil
 }
+
+func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	defer cancel()
+
+	reviews, _, err := gh.client.PullRequests.ListReviews(ctx, repoOwner, repoName, pr, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to list reviews: %w", err)
+	}
+
+	var sb strings.Builder
+
+	for _, review := range reviews {
+		reviewID := review.ID
+		if reviewID == nil {
+			continue
+		}
+
+		comments, _, err := gh.client.PullRequests.ListReviewComments(ctx, repoOwner, repoName, pr, *reviewID, &github.ListOptions{})
+		if err != nil {
+			fmt.Println("Failed to list review comments:", err)
+			continue
+		}
+
+		for _, comment := range comments {
+			// Skip replies to other comments
+			if comment.InReplyTo != nil {
+				continue
+			}
+			if comment.PullRequestReviewID != nil && review.ID != nil && *comment.PullRequestReviewID == *review.ID {
+				lines := strings.Split(*comment.Body, "\n")
+				if len(lines) < 2 {
+					continue
+				}
+
+				parts := strings.Split(lines[0], ":")
+				if len(parts) < 3 {
+					continue
+				}
+
+				file := parts[1]
+				line := parts[2]
+
+				sb.WriteString(fmt.Sprintf("===== Line Level Review: file: %s lines: %s =====\n", file, line))
+
+				if comment.Body != nil {
+					sb.WriteString(strings.Join(lines[1:], "\n"))
+					sb.WriteString("\n")
+				}
+				sb.WriteString("===== END =====\n\n")
+			}
+		}
+	}
+
+	return sb.String(), nil
+}
