@@ -113,6 +113,8 @@ var summarizeCmd = &cobra.Command{
 			return
 		}
 
+		fmt.Println("LLM Response:\n", resp.Content)
+
 		// Send to the review provider
 		if codeReviewerName != "" {
 			summary := common.Summary{}

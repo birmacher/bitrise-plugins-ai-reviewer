@@ -209,28 +209,26 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 				continue
 			}
 			if comment.PullRequestReviewID != nil && review.ID != nil && *comment.PullRequestReviewID == *review.ID {
-				file := ""
-				line := 0
-				startLine := 0
-				if comment.Path != nil {
-					file = *comment.Path
+				lines := strings.Split(*comment.Body, "\n")
+				if len(lines) < 2 {
+					continue
 				}
-				if comment.Line != nil {
-					line = *comment.Line
+
+				parts := strings.Split(lines[0], ":")
+				if len(parts) < 3 {
+					continue
 				}
-				if comment.StartLine != nil {
-					startLine = *comment.StartLine
-				}
-				if startLine > 0 {
-					sb.WriteString(fmt.Sprintf("==== FILE: %s:%d-%d ====\n", file, startLine, line))
-				} else {
-					sb.WriteString(fmt.Sprintf("==== FILE: %s:%d ====\n", file, line))
-				}
+
+				file := parts[1]
+				line := parts[2]
+
+				sb.WriteString(fmt.Sprintf("===== Line Level Review: file: %s lines: %s =====\n", file, line))
+
 				if comment.Body != nil {
-					sb.WriteString(*comment.Body)
+					sb.WriteString(strings.Join(lines[1:], "\n"))
 					sb.WriteString("\n")
 				}
-				sb.WriteString("==== END ====\n")
+				sb.WriteString("===== END =====\n\n")
 			}
 		}
 	}
