@@ -25,7 +25,7 @@ archives:
 
 release:
   github:
-    owner: birmacher
+    owner: bitrise-io
     name: bitrise-plugins-ai-reviewer
   draft: true
   mode: replace
