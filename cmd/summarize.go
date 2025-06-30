@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/llm"
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/prompt"
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/review"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/llm"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/prompt"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 	"github.com/spf13/cobra"
 )
 

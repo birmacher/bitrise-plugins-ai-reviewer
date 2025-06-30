@@ -16,13 +16,13 @@ This plugin helps to automate code reviews by using AI to analyze pull requests 
 ## Installation
 
 ```bash
-bitrise plugin install --source https://github.com/birmacher/bitrise-plugins-ai-reviewer
+bitrise plugin install --source https://github.com/bitrise-io/bitrise-plugins-ai-reviewer
 ```
 
 Or you can install it from local source:
 
 ```bash
-git clone https://github.com/birmacher/bitrise-plugins-ai-reviewer.git
+git clone https://github.com/bitrise-io/bitrise-plugins-ai-reviewer.git
 cd bitrise-plugins-ai-reviewer
 go build -o bin/ai-reviewer
 bitrise plugin install --source .

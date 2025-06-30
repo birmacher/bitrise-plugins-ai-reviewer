@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
 )

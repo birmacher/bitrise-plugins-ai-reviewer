@@ -1,4 +1,4 @@
-module github.com/birmacher/bitrise-plugins-ai-reviewer
+module github.com/bitrise-io/bitrise-plugins-ai-reviewer
 
 go 1.24.3
 

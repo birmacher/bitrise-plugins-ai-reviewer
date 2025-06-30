@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/common"
-	"github.com/birmacher/bitrise-plugins-ai-reviewer/git"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 )
 
 const (
