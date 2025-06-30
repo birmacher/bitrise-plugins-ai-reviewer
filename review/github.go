@@ -149,11 +149,11 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			Path: &ll.File,
 			Line: &ll.LineNumber,
 			Body: &reviewBody,
+			Side: github.String("RIGHT"), // Always set the side to RIGHT for new file content
 		}
 		if ll.LastLineNumber > 0 && ll.LastLineNumber > ll.LineNumber {
 			reviewComment.StartLine = &ll.LineNumber
 			reviewComment.Line = &ll.LastLineNumber
-			reviewComment.Side = github.String("RIGHT")
 		}
 
 		reviewComments = append(reviewComments, reviewComment)
