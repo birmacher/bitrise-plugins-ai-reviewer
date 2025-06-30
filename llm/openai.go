@@ -83,7 +83,7 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		})
 	}
 
-	// Add file contents if available
+	// Add review comments if available
 	if req.ReviewComments != "" {
 		messages = append(messages, openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
