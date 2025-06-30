@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -27,7 +28,7 @@ var summarizeCmd = &cobra.Command{
 		repoTags := strings.Split(repo, "/")
 		if len(repoTags) != 2 {
 			fmt.Println("Repository must be in the format 'owner/repo'")
-			return
+			os.Exit(1)
 		}
 		repoOwner := repoTags[0]
 		repoName := repoTags[1]
@@ -36,7 +37,7 @@ var summarizeCmd = &cobra.Command{
 		pr, err := strconv.Atoi(prStr)
 		if err != nil {
 			fmt.Printf("Invalid PR number: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		var gitProvider review.Reviewer
@@ -45,13 +46,13 @@ var summarizeCmd = &cobra.Command{
 			gitProvider, err = review.NewReviewer(codeReviewerName)
 			if err != nil {
 				fmt.Printf("Failed to create Client for Review Provider: %v\n", err)
-				return
+				os.Exit(1)
 			}
 
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, common.Summary{})
 			if err != nil {
 				fmt.Printf("Error posting review: %v\n", err)
-				return
+				os.Exit(1)
 			}
 		}
 
@@ -64,27 +65,27 @@ var summarizeCmd = &cobra.Command{
 		commitHash, err = git.GetCommitHash(commitHash)
 		if err != nil {
 			fmt.Printf("Error getting commit hash: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		diff, err := git.GetDiff(commitHash, targetBranch)
 
 		if err != nil {
 			fmt.Printf("Error getting diff with parent: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		// Get the file contents
 		fileContent, err := git.GetFileContents(commitHash, targetBranch)
 		if err != nil {
 			fmt.Printf("Error getting file contents: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		reviewComments, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
 		if err != nil {
 			fmt.Printf("Error getting review comments: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		// Setup LLM client
@@ -94,7 +95,7 @@ var summarizeCmd = &cobra.Command{
 		llmClient, err := llm.NewLLM(provider, model)
 		if err != nil {
 			fmt.Printf("Failed to create Client for LLM Provider: %v\n", err)
-			return
+			os.Exit(1)
 		}
 
 		// Setup the prompt
@@ -110,7 +111,7 @@ var summarizeCmd = &cobra.Command{
 		resp := llmClient.Prompt(req)
 		if resp.Error != nil {
 			fmt.Printf("Error getting response: %v\n", resp.Error)
-			return
+			os.Exit(1)
 		}
 
 		fmt.Println("LLM Response:\n", resp.Content)
@@ -121,20 +122,20 @@ var summarizeCmd = &cobra.Command{
 			err = json.Unmarshal([]byte(resp.Content), &summary)
 			if err != nil {
 				fmt.Printf("Error parsing response: %v\n", err)
-				return
+				os.Exit(1)
 			}
 
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary)
 			if err != nil {
 				fmt.Printf("Error posting review: %v\n", err)
-				return
+				os.Exit(1)
 			}
 
 			lineLevel := common.LineLevelFeedback{}
 			err = json.Unmarshal([]byte(resp.Content), &lineLevel)
 			if err != nil {
 				fmt.Printf("Error parsing response: %v\n", err)
-				return
+				os.Exit(1)
 			}
 
 			for idx, ll := range lineLevel.Lines {
@@ -162,7 +163,7 @@ var summarizeCmd = &cobra.Command{
 			err = gitProvider.PostLineFeedback(git, repoOwner, repoName, pr, commitHash, lineLevel)
 			if err != nil {
 				fmt.Printf("Error posting line feedback: %v\n", err)
-				return
+				os.Exit(1)
 			}
 
 			fmt.Println("Review posted successfully!")
