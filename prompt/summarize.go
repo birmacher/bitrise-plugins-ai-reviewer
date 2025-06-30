@@ -5,7 +5,7 @@ func GetSummarizePrompt() string {
 
 - **Summary**: A high-level, to-the-point, short summary of the overall change instead of 
 specific files within 80 words.
-- **Walkthrough**: A markdown table of files and their summaries. Group files 
+- **Walkthrough**: A markdown table of file(s) (multiple files should be a string, separated with commas) and their summaries. Group files 
 with similar changes together into a single row to save space. Return the file name(s) ("files") and a brief summary of the changes ("summary") in each row.
 - **Line Feedback**: A list of issues found in the diff hunks. Return the file ("file"), issue ("issue") and the exact line content ("content") you are commenting on.
 Only include lines that appear in this diff hunk. Do not make up lines. Quote the entire target line exactly as it appears in the diff.
