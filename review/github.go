@@ -198,9 +198,14 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 
 	for _, review := range reviews {
 		// Get comments for each review
+		if review.ID == nil {
+			continue
+		}
+
 		comments, _, err := gh.client.PullRequests.ListReviewComments(ctx, repoOwner, repoName, pr, *review.ID, &github.ListOptions{})
 		if err != nil {
-			return "", fmt.Errorf("failed to list review comments: %w", err)
+			fmt.Println("Failed to list review comments:", err)
+			continue
 		}
 
 		for _, comment := range comments {
