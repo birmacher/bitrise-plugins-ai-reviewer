@@ -103,7 +103,7 @@ var summarizeCmd = &cobra.Command{
 			UserPrompt:     prompt.GetSummarizePrompt(),
 			Diff:           prompt.GetDiffPrompt(diff),
 			FileContents:   prompt.GetFileContentPrompt(fileContent),
-			ReviewComments: prompt.GetCommentsPrompt(reviewComments),
+			ReviewComments: prompt.GetLineLevelPrompt(reviewComments),
 		}
 
 		// Send the prompt and get the response
