@@ -50,6 +50,7 @@ func WithTimeout(timeout int) Option {
 type Reviewer interface {
 	PostSummary(repoOwner, repoName string, pr int, summary common.Summary) error
 	PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error
+	GetReviewRequestComments(repoOwner, repoName string, pr int) (string, error)
 }
 
 // getAPIToken retrieves the API token from environment variables

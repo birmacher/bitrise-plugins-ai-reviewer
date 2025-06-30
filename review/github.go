@@ -184,3 +184,56 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 
 	return nil
 }
+
+func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	defer cancel()
+
+	reviews, _, err := gh.client.PullRequests.ListReviews(ctx, repoOwner, repoName, pr, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to list reviews: %w", err)
+	}
+
+	var sb strings.Builder
+
+	for _, review := range reviews {
+		// Get comments for each review
+		comments, _, err := gh.client.PullRequests.ListReviewComments(ctx, repoOwner, repoName, pr, *review.ID, &github.ListOptions{})
+		if err != nil {
+			return "", fmt.Errorf("failed to list review comments: %w", err)
+		}
+
+		for _, comment := range comments {
+			// Skip replies to other comments
+			if comment.InReplyTo != nil {
+				continue
+			}
+			if comment.PullRequestReviewID != nil && review.ID != nil && *comment.PullRequestReviewID == *review.ID {
+				file := ""
+				line := 0
+				startLine := 0
+				if comment.Path != nil {
+					file = *comment.Path
+				}
+				if comment.Line != nil {
+					line = *comment.Line
+				}
+				if comment.StartLine != nil {
+					startLine = *comment.StartLine
+				}
+				if startLine > 0 {
+					sb.WriteString(fmt.Sprintf("==== FILE: %s:%d-%d ====\n", file, startLine, line))
+				} else {
+					sb.WriteString(fmt.Sprintf("==== FILE: %s:%d ====\n", file, line))
+				}
+				if comment.Body != nil {
+					sb.WriteString(*comment.Body)
+					sb.WriteString("\n")
+				}
+				sb.WriteString("==== END ====\n")
+			}
+		}
+	}
+
+	return sb.String(), nil
+}
