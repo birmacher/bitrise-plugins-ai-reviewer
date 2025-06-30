@@ -185,7 +185,7 @@ func (c *Client) GetChangedFiles(from, to string) ([]string, error) {
 		return nil, errors.New("from and to commits cannot be empty")
 	}
 
-	output, err := c.runner.Run("git", "diff", "--name-only", fmt.Sprintf("%s..%s", from, to))
+	output, err := c.getDiff(fmt.Sprintf("%s..%s", from, to), true)
 	if err != nil {
 		return nil, err
 	}

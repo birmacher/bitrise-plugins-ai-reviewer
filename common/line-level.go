@@ -37,7 +37,7 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 	if len(l.Suggestion) > 0 {
 		body += fmt.Sprintf("\n\n**Suggestion:**\n```suggestion\n%s\n```\n", l.Suggestion)
 	}
-	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), l.Body)
+	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), body)
 }
 
 func (l LineLevel) IsMultiline() bool {
