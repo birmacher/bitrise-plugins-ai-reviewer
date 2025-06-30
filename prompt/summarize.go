@@ -10,7 +10,7 @@ with similar changes together into a single row to save space. Return the file n
 - **Line Feedback**: A list of issues found in the diff hunks. Return the file ("file"), issue ("issue") and the exact line content ("content") you are commenting on.
 Only include lines that appear in this diff hunk. Do not make up lines. Quote the entire target line exactly as it appears in the diff.
 Don't duplicate line feedback that is already presented in the PR.
-If you sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content.
+If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content.
 Focus on bugs, smalls, security issues, and code quality improvements.
 - **Haiku**: Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
 Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.
