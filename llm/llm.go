@@ -5,7 +5,10 @@ import (
 	"os"
 )
 
-const ProviderOpenAI = "openai"
+const (
+	ProviderOpenAI    = "openai"
+	ProviderAnthropic = "anthropic"
+)
 
 // OptionType defines the type of option
 type OptionType string
@@ -95,6 +98,8 @@ func NewLLM(providerName, modelName string, opts ...Option) (LLM, error) {
 	switch providerName {
 	case ProviderOpenAI:
 		llmClient, err = NewOpenAI(apiKey, options...)
+	case ProviderAnthropic:
+		llmClient, err = NewAnthropic(apiKey, options...)
 	default:
 		err = fmt.Errorf("unsupported provider: %s", providerName)
 	}
