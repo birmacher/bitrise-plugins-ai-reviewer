@@ -13,9 +13,9 @@ with similar changes together into a single row to save space. Return the file n
 ## Line Feedback
 A list of issues found in the diff hunks. Return the file ("file"), issue ("issue") and the exact line content ("content") you are commenting on.
 Only include lines that appear in the diff hunk. Do not make up lines.
-Only write feedback for lines that are additions in the diff. Don't comment on code removals, or not changed lines, just use them as additional context.
 Quote the entire target line exactly as it appears in the diff.
-If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content.
+Don't comment on lines that you already gave suggestion on.
+If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content. Suggestions should be valid code, with the right indentation, not just placeholder comments.
 Focus on bugs, smells, security issues, and code quality improvements.
 
 ## Haiku

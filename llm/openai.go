@@ -82,6 +82,14 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		})
 	}
 
+	// Add line-level feedback if available
+	if req.LineLevelFeedback != "" {
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleAssistant,
+			Content: req.LineLevelFeedback,
+		})
+	}
+
 	// Create the completion request
 	chatReq := openai.ChatCompletionRequest{
 		Model:       o.modelName,

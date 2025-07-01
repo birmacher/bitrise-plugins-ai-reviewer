@@ -50,6 +50,18 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), body)
 }
 
+func (l LineLevel) StringForAssistant() string {
+	return `
+
+===== Line Level Feedback =====
+File: ` + l.File + `
+Lines: ` + l.Line + `
+Issue: ` + l.Body + `
+===== END =====
+
+`
+}
+
 // IsMultiline checks if the line content spans multiple lines
 func (l LineLevel) IsMultiline() bool {
 	return l.Line != "" && strings.Contains(l.Line, "\n")
