@@ -92,8 +92,11 @@ func parseDiffChangedLines(diff []byte, targetFile string) map[int]bool {
 			// Diff hunk header
 			matches := re.FindStringSubmatch(line)
 			if len(matches) >= 2 {
-				newLineNum = atoi(matches[1])
-				// The diff hunk may have a range (e.g., +42,7)
+				var err error
+				newLineNum, err = strconv.Atoi(matches[1])
+				if err != nil {
+					continue
+				}
 			}
 			continue
 		}
@@ -118,10 +121,4 @@ func parseDiffChangedLines(diff []byte, targetFile string) map[int]bool {
 		}
 	}
 	return changed
-}
-
-// This is a simplified version of strconv.Atoi for parsing line numbers in diff chunks
-func atoi(s string) int {
-	n, _ := strconv.Atoi(s)
-	return n
 }

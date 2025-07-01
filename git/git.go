@@ -96,6 +96,10 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 		if err != nil {
 			return "", err
 		}
+		if output == "" {
+			fmt.Println(" [!] File not found or empty:", filePath)
+			continue
+		}
 		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s =====\n%s\n===== END =====\n\n", filePath, output))
 	}
 
@@ -202,9 +206,10 @@ func (c *Client) getFileContent(commitHash, filePath string) (string, error) {
 		return "", errors.New("commit hash and file path cannot be empty")
 	}
 
+	// check if the file exists in the commit
 	output, err := c.runner.Run("git", "show", fmt.Sprintf("%s:%s", commitHash, filePath))
 	if err != nil {
-		return "", fmt.Errorf("error getting file content: %w", err)
+		return "", nil
 	}
 
 	return output, nil
