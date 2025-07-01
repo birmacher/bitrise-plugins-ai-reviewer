@@ -140,7 +140,19 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	for _, ll := range lineFeedback.Lines {
-		for _, existingComment := range addedComments {
+skip := false
+for _, existingComment := range addedComments {
+	if ll.File == existingComment.File &&
+		ll.LineNumber >= existingComment.LineNumber &&
+		ll.LineNumber <= existingComment.LastLineNumber {
+		fmt.Println("Skipping existing comment for file:", ll.File, "line:", ll.LineNumber)
+		skip = true
+		break
+	}
+}
+if skip {
+	continue
+}
 			if ll.File == existingComment.File &&
 				ll.LineNumber >= existingComment.LineNumber &&
 				ll.LineNumber <= existingComment.LastLineNumber {
