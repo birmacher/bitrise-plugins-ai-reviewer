@@ -14,8 +14,9 @@ with similar changes together into a single row to save space. Return the file n
 A list of issues found in the diff hunks. Return the file ("file"), issue ("issue") and the exact line content ("content") you are commenting on.
 Only include lines that appear in this diff hunk. Do not make up lines. Quote the entire target line exactly as it appears in the diff.
 If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content.
-Focus on bugs, smalls, security issues, and code quality improvements.
-** Line Feedback as comments already added to the PR can be found below and should not be repeated.
+Focus on bugs, smells, security issues, and code quality improvements.
+
+Line Feedback that has been already added to the PR can be found below and should not be repeated - avoid the same or similar feedback.
 ` + lineFeedback + `
 
 ## Haiku
