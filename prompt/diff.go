@@ -1,13 +1,13 @@
 package prompt
 
 func GetDiffPrompt(diffContent string) string {
-	return `Below is the raw PR diff for context.
+	return `
 
-` + diffContent
-}
+===== PR DIFF =====
 
-func GetFileContentPrompt(fileContents string) string {
-	return `Here is the full content of the changed files for better context:
+` + diffContent + `
 
-` + fileContents
+===== PR DIFF END =====
+
+`
 }

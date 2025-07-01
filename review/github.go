@@ -190,6 +190,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 }
 
 func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (string, error) {
+	fmt.Println("!!!! Fetching review request comments...")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
@@ -201,30 +202,37 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 	var sb strings.Builder
 
 	for _, review := range reviews {
-		reviewID := review.ID
-		if reviewID == nil {
+		fmt.Println("Processing review:", *review.ID)
+		if review.ID == nil {
+			fmt.Println("Skipping review with nil ID")
 			continue
 		}
 
-		comments, _, err := gh.client.PullRequests.ListReviewComments(ctx, repoOwner, repoName, pr, *reviewID, &github.ListOptions{})
+		comments, _, err := gh.client.PullRequests.ListReviewComments(ctx, repoOwner, repoName, pr, *review.ID, &github.ListOptions{})
 		if err != nil {
 			fmt.Println("Failed to list review comments:", err)
 			continue
 		}
 
+		fmt.Println("Comments found: ", len(comments))
+
 		for _, comment := range comments {
+			fmt.Println("> Processing comment:", *comment.Body)
 			// Skip replies to other comments
 			if comment.InReplyTo != nil {
+				fmt.Println("Skipping reply to another comment")
 				continue
 			}
 			if comment.PullRequestReviewID != nil && review.ID != nil && *comment.PullRequestReviewID == *review.ID {
 				lines := strings.Split(*comment.Body, "\n")
 				if len(lines) < 2 {
+					fmt.Println("Skipping comment with insufficient lines")
 					continue
 				}
 
 				parts := strings.Split(lines[0], ":")
 				if len(parts) < 3 {
+					fmt.Println("Skipping comment with insufficient parts")
 					continue
 				}
 

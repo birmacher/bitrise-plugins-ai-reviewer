@@ -97,6 +97,11 @@ var summarizeCmd = &cobra.Command{
 			FileContents: prompt.GetFileContentPrompt(fileContent),
 		}
 
+		fmt.Println(prompt.GetSystemPrompt())
+		fmt.Println(prompt.GetSummarizePrompt(reviewComments))
+		fmt.Println(prompt.GetDiffPrompt(diff))
+		fmt.Println(prompt.GetFileContentPrompt(fileContent))
+
 		// Send the prompt and get the response
 		resp := llmClient.Prompt(req)
 		if resp.Error != nil {
