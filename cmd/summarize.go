@@ -91,11 +91,10 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt:   prompt.GetSystemPrompt(),
-			UserPrompt:     prompt.GetSummarizePrompt(),
-			Diff:           prompt.GetDiffPrompt(diff),
-			FileContents:   prompt.GetFileContentPrompt(fileContent),
-			ReviewComments: prompt.GetLineLevelPrompt(reviewComments),
+			SystemPrompt: prompt.GetSystemPrompt(),
+			UserPrompt:   prompt.GetSummarizePrompt(reviewComments),
+			Diff:         prompt.GetDiffPrompt(diff),
+			FileContents: prompt.GetFileContentPrompt(fileContent),
 		}
 
 		// Send the prompt and get the response
