@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,7 +134,21 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 
 	reviewComments := make([]*github.DraftReviewComment, 0)
 
+	addedComments, err := gh.GetReviewRequestComments(repoOwner, repoName, pr)
+	if err != nil {
+		return fmt.Errorf("failed to get existing review comments: %w", err)
+	}
+
 	for _, ll := range lineFeedback.Lines {
+		for _, existingComment := range addedComments {
+			if ll.File == existingComment.File &&
+				ll.LineNumber >= existingComment.LineNumber &&
+				ll.LineNumber <= existingComment.LastLineNumber {
+				fmt.Println("Skipping existing comment for file:", ll.File, "line:", ll.LineNumber)
+				continue
+			}
+		}
+
 		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
 
 		if err != nil {
@@ -189,20 +204,16 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	return nil
 }
 
-func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (string, error) {
-	// TODO:
-	// GET the review comments on the PR
-	// If the file, blame match and the line overlap for the new comment, skip it
-
+func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) ([]common.LineLevel, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
+	lineReviews := make([]common.LineLevel, 0)
+
 	reviews, _, err := gh.client.PullRequests.ListReviews(ctx, repoOwner, repoName, pr, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to list reviews: %w", err)
+		return nil, fmt.Errorf("failed to list reviews: %w", err)
 	}
-
-	var sb strings.Builder
 
 	for _, review := range reviews {
 		if review.ID == nil {
@@ -230,21 +241,42 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 				}
 
 				parts := strings.Split(lines[0], ":")
-				if len(parts) < 3 {
+				if len(parts) < 4 {
 					fmt.Println("Skipping comment with insufficient parts")
 					continue
 				}
 
-				sb.WriteString(fmt.Sprintf("===== Line Level Review for file: %s =====\n", parts[1]))
+				file := strings.TrimSpace(parts[1])
+				line := strings.TrimSpace(parts[2])
 
-				if comment.Body != nil {
-					sb.WriteString(strings.Join(lines[1:], "\n"))
-					sb.WriteString("\n")
+				var firstLine, lastLine int
+				if strings.Contains(line, "-") {
+					// Handle multi-line comments
+					lineParts := strings.Split(line, "-")
+					if len(lineParts) != 2 {
+						fmt.Println("Skipping comment with invalid line range")
+						continue
+					}
+					firstLine, _ = strconv.Atoi(strings.TrimSpace(lineParts[0]))
+					lastLine, _ = strconv.Atoi(strings.TrimSpace(lineParts[1]))
+				} else {
+					firstLine, _ = strconv.Atoi(strings.TrimSpace(line))
+					lastLine = firstLine
 				}
-				sb.WriteString("===== END =====\n\n")
+
+				blame := strings.TrimSpace(parts[3])
+				blame = strings.TrimSpace(strings.Split(blame, " ")[0])
+
+				lineReviews = append(lineReviews, common.LineLevel{
+					File:           file,
+					LineNumber:     firstLine,
+					LastLineNumber: lastLine,
+					CommitHash:     blame,
+					Body:           strings.Join(lines[1:], "\n"),
+				})
 			}
 		}
 	}
 
-	return sb.String(), nil
+	return lineReviews, nil
 }

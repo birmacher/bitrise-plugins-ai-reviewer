@@ -9,12 +9,13 @@ import (
 
 // LineLevel represents a review comment for a specific line of code
 type LineLevel struct {
-	File           string `json:"file"`                 // Path to the file being commented on
-	Line           string `json:"content"`              // Content of the line being commented on
-	LineNumber     int    `json:"line"`                 // Line number in the file
-	LastLineNumber int    `json:"last_line"`            // Last line number for multi-line comments
-	Suggestion     string `json:"suggestion,omitempty"` // Suggested replacement for the line
-	Body           string `json:"issue"`                // Main body of the review comment
+	File           string `json:"file"`                  // Path to the file being commented on
+	Line           string `json:"content"`               // Content of the line being commented on
+	LineNumber     int    `json:"line"`                  // Line number in the file
+	LastLineNumber int    `json:"last_line"`             // Last line number for multi-line comments
+	Suggestion     string `json:"suggestion,omitempty"`  // Suggested replacement for the line
+	Body           string `json:"issue"`                 // Main body of the review comment
+	CommitHash     string `json:"commit_hash,omitempty"` // Commit hash for the line being commented on
 }
 
 // LineLevelFeedback represents a collection of line-level feedback items
