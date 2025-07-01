@@ -75,11 +75,6 @@ var summarizeCmd = &cobra.Command{
 			return fmt.Errorf("error getting file contents: %v", err)
 		}
 
-		reviewComments, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
-		if err != nil {
-			return fmt.Errorf("error getting review comments: %v", err)
-		}
-
 		// Setup LLM client
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
@@ -92,15 +87,10 @@ var summarizeCmd = &cobra.Command{
 		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(),
-			UserPrompt:   prompt.GetSummarizePrompt(reviewComments),
+			UserPrompt:   prompt.GetSummarizePrompt(),
 			Diff:         prompt.GetDiffPrompt(diff),
 			FileContents: prompt.GetFileContentPrompt(fileContent),
 		}
-
-		fmt.Println(prompt.GetSystemPrompt())
-		fmt.Println(prompt.GetSummarizePrompt(reviewComments))
-		fmt.Println(prompt.GetDiffPrompt(diff))
-		fmt.Println(prompt.GetFileContentPrompt(fileContent))
 
 		// Send the prompt and get the response
 		resp := llmClient.Prompt(req)

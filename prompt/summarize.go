@@ -1,6 +1,6 @@
 package prompt
 
-func GetSummarizePrompt(lineFeedback string) string {
+func GetSummarizePrompt() string {
 	return `Provide your final response with the following content:
 
 ## Summary
@@ -17,9 +17,6 @@ Only write feedback for lines that are additions in the diff. Don't comment on c
 Quote the entire target line exactly as it appears in the diff.
 If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content.
 Focus on bugs, smells, security issues, and code quality improvements.
-
-Line Feedback that has been already added to the PR can be found below and should not be repeated - avoid the same or similar feedback.
-` + lineFeedback + `
 
 ## Haiku
 Write a whimsical, short haiku to celebrate the changes as "Bit Bot".

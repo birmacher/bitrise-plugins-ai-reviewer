@@ -190,7 +190,10 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 }
 
 func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (string, error) {
-	fmt.Println("!!!! Fetching review request comments...")
+	// TODO:
+	// GET the review comments on the PR
+	// If the file, blame match and the line overlap for the new comment, skip it
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
@@ -202,7 +205,6 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 	var sb strings.Builder
 
 	for _, review := range reviews {
-		fmt.Println("Processing review:", *review.ID)
 		if review.ID == nil {
 			fmt.Println("Skipping review with nil ID")
 			continue
@@ -214,10 +216,7 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 			continue
 		}
 
-		fmt.Println("Comments found: ", len(comments))
-
 		for _, comment := range comments {
-			fmt.Println("> Processing comment:", *comment.Body)
 			// Skip replies to other comments
 			if comment.InReplyTo != nil {
 				fmt.Println("Skipping reply to another comment")
@@ -236,7 +235,7 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 					continue
 				}
 
-				sb.WriteString(fmt.Sprintf("===== Line Level Review: file: %s lines: %s =====\n", parts[1], parts[2]))
+				sb.WriteString(fmt.Sprintf("===== Line Level Review for file: %s =====\n", parts[1]))
 
 				if comment.Body != nil {
 					sb.WriteString(strings.Join(lines[1:], "\n"))
