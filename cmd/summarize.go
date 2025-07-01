@@ -75,6 +75,12 @@ var summarizeCmd = &cobra.Command{
 			return fmt.Errorf("error getting file contents: %v", err)
 		}
 
+		// Get existing review comments
+		lineLevelFeedback, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
+		if err != nil {
+			return fmt.Errorf("error getting existing review comments: %v", err)
+		}
+
 		// Setup LLM client
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
@@ -86,10 +92,11 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(),
-			UserPrompt:   prompt.GetSummarizePrompt(),
-			Diff:         prompt.GetDiffPrompt(diff),
-			FileContents: prompt.GetFileContentPrompt(fileContent),
+			SystemPrompt:      prompt.GetSystemPrompt(),
+			UserPrompt:        prompt.GetSummarizePrompt(),
+			Diff:              prompt.GetDiffPrompt(diff),
+			FileContents:      prompt.GetFileContentPrompt(fileContent),
+			LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),
 		}
 
 		// Send the prompt and get the response
@@ -126,6 +133,7 @@ var summarizeCmd = &cobra.Command{
 					continue
 				}
 				lineLevel.Lines[idx].LineNumber = lineNumber
+				lineLevel.Lines[idx].LastLineNumber = lineNumber
 
 				if ll.IsMultiline() {
 					lastLineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
