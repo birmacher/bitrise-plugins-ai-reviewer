@@ -6,14 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
+// ChangedLine represents a single line that was changed in a diff
 type ChangedLine struct {
 	LineNumber  int
 	LineContent string
 }
 
+// GetLineNumber finds the line number of a matching line in the changed file
+// It returns the line number if found in the diff, or an error if not found
 func GetLineNumber(fileName string, fileContent []byte, diffContent []byte, matchLine string) (int, error) {
 	fileContentStr, err := getFileContentFromString(string(fileContent), fileName)
 	if err != nil {
@@ -32,6 +36,8 @@ func GetLineNumber(fileName string, fileContent []byte, diffContent []byte, matc
 	return 0, fmt.Errorf("line '%s' not found in the diff", matchLine)
 }
 
+// getFileContentFromString extracts content for a specific file from a multi-file string representation
+// Each file is expected to be prefixed with "===== FILE: filename ====="
 func getFileContentFromString(input string, targetFile string) (string, error) {
 	lines := strings.Split(input, "\n")
 
@@ -60,6 +66,7 @@ func getFileContentFromString(input string, targetFile string) (string, error) {
 	return "", errors.New("file not found: " + targetFile)
 }
 
+// getMatchingLines returns line numbers where the content matches the given line
 func getMatchingLines(fileContent []byte, matchLine string) []int {
 	scanner := bufio.NewScanner(bytes.NewReader(fileContent))
 	var lineNumbers []int
@@ -73,6 +80,7 @@ func getMatchingLines(fileContent []byte, matchLine string) []int {
 	return lineNumbers
 }
 
+// parseDiffChangedLines parses a git diff and returns a map of line numbers that were changed in the target file
 func parseDiffChangedLines(diff []byte, targetFile string) map[int]bool {
 	changed := map[int]bool{}
 	lines := strings.Split(string(diff), "\n")
@@ -84,8 +92,11 @@ func parseDiffChangedLines(diff []byte, targetFile string) map[int]bool {
 			// Diff hunk header
 			matches := re.FindStringSubmatch(line)
 			if len(matches) >= 2 {
-				newLineNum = atoi(matches[1])
-				// The diff hunk may have a range (e.g., +42,7)
+				var err error
+				newLineNum, err = strconv.Atoi(matches[1])
+				if err != nil {
+					continue
+				}
 			}
 			continue
 		}
@@ -110,10 +121,4 @@ func parseDiffChangedLines(diff []byte, targetFile string) map[int]bool {
 		}
 	}
 	return changed
-}
-
-func atoi(s string) int {
-	var n int
-	fmt.Sscanf(s, "%d", &n)
-	return n
 }

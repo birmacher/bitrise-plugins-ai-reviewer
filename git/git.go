@@ -8,10 +8,20 @@ import (
 	"strings"
 )
 
+const (
+	// DefaultRenameThreshold is the default threshold for detecting file renames
+	DefaultRenameThreshold = "90%"
+	// DefaultDiffAlgorithm is the default algorithm for computing diffs
+	DefaultDiffAlgorithm = "minimal"
+)
+
 // Runner defines an interface for running git commands
 type Runner interface {
 	Run(name string, args ...string) (string, error)
 }
+
+// Ensure DefaultRunner implements Runner interface
+var _ Runner = (*DefaultRunner)(nil)
 
 // DefaultRunner implements the Runner interface using exec.Command
 type DefaultRunner struct {
@@ -74,6 +84,9 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	return c.GetDiffWithParent(commitHash, false)
 }
 
+// GetFileContents retrieves the content of all files changed in the specified commit.
+// If targetBranch is provided, it compares against the merge-base with that branch.
+// Returns a formatted string containing the content of all changed files.
 func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error) {
 	fmt.Println("")
 	fmt.Println("Generating file contents...")
@@ -96,12 +109,18 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 		if err != nil {
 			return "", err
 		}
+		if output == "" {
+			fmt.Println(" [!] File not found or empty:", filePath)
+			continue
+		}
 		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s =====\n%s\n===== END =====\n\n", filePath, output))
 	}
 
 	return strings.Join(fileOutput, "\n\n"), nil
 }
 
+// GetBlameForFileLine retrieves the commit hash that last modified the specified line in a file.
+// Returns the commit hash responsible for the given line.
 func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNumber int) (string, error) {
 	if commitHash == "" || filePath == "" || lineNumber <= 0 {
 		return "", errors.New("commit hash, file path and line number cannot be empty")
@@ -119,6 +138,7 @@ func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNum
 	return parts[0], nil
 }
 
+// GetCommitHash returns the provided commit hash or the current commit hash if none is provided.
 func (c *Client) GetCommitHash(commitHash string) (string, error) {
 	if commitHash == "" {
 		fmt.Println("No commit hash provided, fetching current commit hash...")
@@ -139,8 +159,8 @@ func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
 		"diff",
 		"--no-color",
 		"--no-ext-diff",
-		"--diff-algorithm=minimal",
-		"--find-renames=90%",
+		"--diff-algorithm=" + DefaultDiffAlgorithm,
+		"--find-renames=" + DefaultRenameThreshold,
 		"-U0",
 		commitRange,
 	}
@@ -202,9 +222,10 @@ func (c *Client) getFileContent(commitHash, filePath string) (string, error) {
 		return "", errors.New("commit hash and file path cannot be empty")
 	}
 
+	// check if the file exists in the commit
 	output, err := c.runner.Run("git", "show", fmt.Sprintf("%s:%s", commitHash, filePath))
 	if err != nil {
-		return "", fmt.Errorf("error getting file content: %w", err)
+		return "", nil
 	}
 
 	return output, nil

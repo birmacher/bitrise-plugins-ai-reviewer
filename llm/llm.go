@@ -49,11 +49,10 @@ func WithAPITimeout(timeout int) Option {
 
 // Request represents the data needed to generate a prompt for the LLM
 type Request struct {
-	SystemPrompt   string
-	UserPrompt     string
-	Diff           string
-	FileContents   string
-	ReviewComments string
+	SystemPrompt string
+	UserPrompt   string
+	Diff         string
+	FileContents string
 }
 
 // Response represents the response from the LLM
