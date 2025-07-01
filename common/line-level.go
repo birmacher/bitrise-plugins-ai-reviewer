@@ -51,15 +51,9 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 }
 
 func (l LineLevel) StringForAssistant() string {
-	return `
-
-===== Line Level Feedback =====
-File: ` + l.File + `
-Lines: ` + l.Line + `
-Issue: ` + l.Body + `
-===== END =====
-
-`
+	return `===== Line Level Feedback On File: ` + l.File + ` =====
+` + l.Body + `
+===== END =====`
 }
 
 // IsMultiline checks if the line content spans multiple lines
