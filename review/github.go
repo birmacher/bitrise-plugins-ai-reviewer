@@ -228,10 +228,7 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 					continue
 				}
 
-				file := parts[1]
-				line := parts[2]
-
-				sb.WriteString(fmt.Sprintf("===== Line Level Review: file: %s lines: %s =====\n", file, line))
+				sb.WriteString(fmt.Sprintf("===== Line Level Review: file: %s lines: %s =====\n", parts[1], parts[2]))
 
 				if comment.Body != nil {
 					sb.WriteString(strings.Join(lines[1:], "\n"))
