@@ -5,6 +5,10 @@ import (
 )
 
 func GetLineLevelFeedbackPrompt(feedbacks []common.LineLevel) string {
+	if len(feedbacks) == 0 {
+		return ""
+	}
+
 	feedbackStr := ""
 	for _, feedback := range feedbacks {
 		feedbackStr += "\n\n" + feedback.StringForAssistant()
