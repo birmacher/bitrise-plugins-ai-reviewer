@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -55,7 +56,15 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	tc := oauth2.NewClient(context.Background(), ts)
 
 	if gh.baseURL != "" {
-		client, err := github.NewEnterpriseClient(gh.baseURL, gh.baseURL, tc)
+		apiURL, err := url.JoinPath(gh.baseURL, "api/v3")
+		if err != nil {
+			return nil, fmt.Errorf("failed to join API URL path: %w", err)
+		}
+		uploadsURL, err := url.JoinPath(gh.baseURL, "uploads")
+		if err != nil {
+			return nil, fmt.Errorf("failed to join uploads URL path: %w", err)
+		}
+		client, err := github.NewEnterpriseClient(apiURL, uploadsURL, tc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create GitHub Enterprise client: %w", err)
 		}

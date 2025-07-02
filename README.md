@@ -40,7 +40,7 @@ export OPENAI_API_KEY=your_openai_api_key
 For GitHub Enterprise, you can configure the API URL:
 
 ```bash
-export GITHUB_API_URL=https://github.yourdomain.com/api/v3
+export GITHUB_API_URL=https://github.yourdomain.com
 ```
 
 ## Usage
