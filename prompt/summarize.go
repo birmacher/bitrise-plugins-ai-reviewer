@@ -11,7 +11,7 @@ func GetSummarizePrompt(settings common.Settings) string {
 ` + getSummary(settings) + `
 ` + getWalkthrough(settings) + `
 ## Line Feedback
-A list of issues found in the diff hunks. Return the file ("file"), issue ("issue"), category ("category") and the exact line content ("content") you are commenting on.
+A list of issues found in the diff hunks. Return the file ("file"), short title of the issue ("title"), category ("category"), brief description of the issue ("issue") and the exact line content ("content") you are commenting on.
 Only include lines that appear in the diff hunk. Do not make up lines.
 Quote the entire target line exactly as it appears in the diff.
 Don't comment on lines that you already gave suggestion on.

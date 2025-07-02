@@ -15,6 +15,7 @@ type LineLevel struct {
 	LineNumber     int    `json:"line"`                  // Line number in the file
 	LastLineNumber int    `json:"last_line"`             // Last line number for multi-line comments
 	Suggestion     string `json:"suggestion,omitempty"`  // Suggested replacement for the line
+	Title          string `json:"title,omitempty"`       // Short title for the issue
 	Body           string `json:"issue"`                 // Main body of the review comment
 	CommitHash     string `json:"commit_hash,omitempty"` // Commit hash for the line being commented on
 }
@@ -44,9 +45,16 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 
 // String formats the complete comment with header, body and suggestion
 func (l LineLevel) String(client *git.Client, commitHash string) string {
+	if l.File == "" || l.LineNumber <= 0 || l.Body == "" {
+		return ""
+	}
+
 	body := []string{}
 	if l.Category != "" {
-		body = append(body, fmt.Sprintf("**Category:** %s", l.getCategoryString()))
+		body = append(body, fmt.Sprintf("_%s_", l.getCategoryString()))
+	}
+	if l.Title != "" {
+		body = append(body, fmt.Sprintf("**%s**", l.Title))
 	}
 	body = append(body, l.Body)
 	if len(l.Suggestion) > 0 {
