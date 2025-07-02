@@ -25,6 +25,8 @@ func (s Summary) Header() string {
 // String formats the complete summary as a markdown string
 func (s Summary) String(settings Settings) string {
 	var builder strings.Builder
+	builder.WriteString(s.Header() + "\n\n")
+
 	if settings.Reviews.CollapseWalkthrough {
 		builder.WriteString("<details>\n")
 		builder.WriteString("<summary>📝 Summary of changes</summary>\n\n")
