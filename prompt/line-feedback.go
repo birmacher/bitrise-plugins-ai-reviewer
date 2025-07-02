@@ -1,6 +1,8 @@
 package prompt
 
 import (
+	"strings"
+
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
@@ -15,5 +17,5 @@ func GetLineLevelFeedbackPrompt(feedbacks []common.LineLevel) string {
 	}
 	return `Feedback already given in the PR comments:
 
-` + feedbackStr
+` + strings.TrimRight(feedbackStr, "\n")
 }

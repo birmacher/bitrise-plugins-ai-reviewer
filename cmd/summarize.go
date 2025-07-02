@@ -110,9 +110,22 @@ var summarizeCmd = &cobra.Command{
 		// Send to the review provider
 		if codeReviewerName != "" {
 			summary := common.Summary{}
-			err = json.Unmarshal([]byte(resp.Content), &summary)
-			if err != nil {
-				return fmt.Errorf("error parsing response: %v", err)
+			if err = json.Unmarshal([]byte(resp.Content), &summary); err != nil {
+				// If it's a SyntaxError, print the offset and show context
+				if e, ok := err.(*json.SyntaxError); ok {
+					fmt.Printf("Syntax error at byte offset: %d\n", e.Offset)
+					start := int(e.Offset) - 10
+					end := int(e.Offset) + 10
+					if start < 0 {
+						start = 0
+					}
+					if end > len(resp.Content) {
+						end = len(resp.Content)
+					}
+					fmt.Printf("Context: %s\n", resp.Content[start:end])
+				}
+
+				return fmt.Errorf("error parsing summary response: %v", err)
 			}
 
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary)
@@ -121,9 +134,22 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			lineLevel := common.LineLevelFeedback{}
-			err = json.Unmarshal([]byte(resp.Content), &lineLevel)
-			if err != nil {
-				return fmt.Errorf("error parsing response: %v", err)
+			if err = json.Unmarshal([]byte(resp.Content), &lineLevel); err != nil {
+				// If it's a SyntaxError, print the offset and show context
+				if e, ok := err.(*json.SyntaxError); ok {
+					fmt.Printf("Syntax error at byte offset: %d\n", e.Offset)
+					start := int(e.Offset) - 10
+					end := int(e.Offset) + 10
+					if start < 0 {
+						start = 0
+					}
+					if end > len(resp.Content) {
+						end = len(resp.Content)
+					}
+					fmt.Printf("Context: %s\n", resp.Content[start:end])
+				}
+
+				return fmt.Errorf("error parsing line-level response: %v", err)
 			}
 
 			for idx, ll := range lineLevel.Lines {

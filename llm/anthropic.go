@@ -58,41 +58,21 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(a.apiTimeout)*time.Second)
 	defer cancel()
 
+	var contentBlocks []anthropic.ContentBlockParamUnion
+
 	// Combine user content (prompt, diff, file contents)
-	messages := []anthropic.MessageParam{
-		{
-			Role: anthropic.MessageParamRoleUser,
-			Content: []anthropic.ContentBlockParamUnion{
-				anthropic.NewTextBlock(req.UserPrompt),
-			},
-		},
-	}
+	contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.UserPrompt))
 
 	if req.Diff != "" {
-		messages = append(messages, anthropic.MessageParam{
-			Role: anthropic.MessageParamRoleUser,
-			Content: []anthropic.ContentBlockParamUnion{
-				anthropic.NewTextBlock(req.Diff),
-			},
-		})
+		contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.Diff))
 	}
 
 	if req.FileContents != "" {
-		messages = append(messages, anthropic.MessageParam{
-			Role: anthropic.MessageParamRoleUser,
-			Content: []anthropic.ContentBlockParamUnion{
-				anthropic.NewTextBlock(req.FileContents),
-			},
-		})
+		contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.FileContents))
 	}
 
 	if req.LineLevelFeedback != "" {
-		messages = append(messages, anthropic.MessageParam{
-			Role: anthropic.MessageParamRoleAssistant,
-			Content: []anthropic.ContentBlockParamUnion{
-				anthropic.NewTextBlock(req.LineLevelFeedback),
-			},
-		})
+		contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.LineLevelFeedback))
 	}
 
 	// Convert model name string to anthropic.Model
@@ -104,6 +84,8 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 		model = anthropic.ModelClaude3_5SonnetLatest
 	case "claude-3.5-haiku":
 		model = anthropic.ModelClaude3_5HaikuLatest
+	case "claude-4.0-sonnet":
+		model = anthropic.ModelClaudeSonnet4_0
 	default:
 		model = anthropic.ModelClaude3_7SonnetLatest // Default fallback
 	}
@@ -115,7 +97,12 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 		System: []anthropic.TextBlockParam{
 			{Text: req.SystemPrompt},
 		},
-		Messages: messages,
+		Messages: []anthropic.MessageParam{
+			{
+				Role:    anthropic.MessageParamRoleUser,
+				Content: contentBlocks,
+			},
+		},
 	}
 
 	// Make the API call
