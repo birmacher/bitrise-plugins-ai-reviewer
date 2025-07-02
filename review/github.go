@@ -18,6 +18,7 @@ type GitHub struct {
 	client   *github.Client
 	apiToken string
 	timeout  int
+	baseURL  string
 }
 
 // NewGitHub creates a new GitHub reviewer client
@@ -37,6 +38,10 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 			if timeout, ok := opt.Value.(int); ok {
 				gh.timeout = timeout
 			}
+		case BaseURLOption:
+			if baseURL, ok := opt.Value.(string); ok {
+				gh.baseURL = baseURL
+			}
 		}
 	}
 
@@ -48,7 +53,16 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	// Create GitHub client
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: gh.apiToken})
 	tc := oauth2.NewClient(context.Background(), ts)
-	gh.client = github.NewClient(tc)
+
+	if gh.baseURL != "" {
+		client, err := github.NewEnterpriseClient(gh.baseURL, gh.baseURL, tc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GitHub Enterprise client: %w", err)
+		}
+		gh.client = client
+	} else {
+		gh.client = github.NewClient(tc)
+	}
 
 	return gh, nil
 }
