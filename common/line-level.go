@@ -46,7 +46,7 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 func (l LineLevel) String(client *git.Client, commitHash string) string {
 	body := []string{}
 	if l.Category != "" {
-		body = append(body, fmt.Sprintf("**Category:** %s", l.Category))
+		body = append(body, fmt.Sprintf("**Category:** %s", l.getCategoryString()))
 	}
 	body = append(body, l.Body)
 	if len(l.Suggestion) > 0 {
@@ -81,4 +81,23 @@ func (l LineLevel) LastLine() string {
 	}
 	lines := strings.Split(l.Line, "\n")
 	return lines[len(lines)-1]
+}
+
+func (l LineLevel) getCategoryString() string {
+	switch l.Category {
+	case "issue":
+		return "⚠️ Potential Issue"
+	case "refactor":
+		return "🔧 Refactor Suggestion"
+	case "improvement":
+		return "💡 Improvement"
+	case "documentation":
+		return "📚 Documentation"
+	case "nitpick":
+		return "📝 Nitpick"
+	case "test coverage":
+		return "🧪 Test Coverage"
+	}
+
+	return ""
 }

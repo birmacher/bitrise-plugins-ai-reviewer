@@ -17,7 +17,7 @@ Quote the entire target line exactly as it appears in the diff.
 Don't comment on lines that you already gave suggestion on.
 If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content. Suggestions should be valid code, with the right indentation, not just placeholder comments.
 Focus on bugs, smells, security issues, and code quality improvements.
-Categorize the issues as "potential issue", "refactor suggestion", improvements, "documentation", "nitpick", "test coverage"
+Categorize the issues as "issue", "refactor", improvement, "documentation", "nitpick", "test coverage"
 ` + getHaiku(settings) + `
 ---
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
