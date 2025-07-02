@@ -21,7 +21,7 @@ type OptionType string
 const (
 	APITokenOption OptionType = "api_token"
 	TimeoutOption  OptionType = "timeout"
-	// Add more option types as needed
+	BaseURLOption  OptionType = "base_url"
 )
 
 // Option represents a generic configuration option for any review provider
@@ -43,6 +43,14 @@ func WithTimeout(timeout int) Option {
 	return Option{
 		Type:  TimeoutOption,
 		Value: timeout,
+	}
+}
+
+// WithBaseURL creates an option to set the base URL for GitHub Enterprise
+func WithBaseURL(baseURL string) Option {
+	return Option{
+		Type:  BaseURLOption,
+		Value: baseURL,
 	}
 }
 
@@ -76,6 +84,12 @@ func NewReviewer(providerName string, opts ...Option) (Reviewer, error) {
 		WithAPIToken(apiToken),
 		WithTimeout(60),
 	}
+
+	// Check for GitHub Enterprise URL
+	if githubURL := os.Getenv("GITHUB_API_URL"); githubURL != "" && providerName == ProviderGitHub {
+		options = append(options, WithBaseURL(githubURL))
+	}
+
 	options = append(options, opts...)
 
 	switch providerName {
