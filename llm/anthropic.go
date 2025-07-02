@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -14,22 +15,24 @@ type AnthropicModel struct {
 	client     anthropic.Client
 	modelName  string
 	maxTokens  int
-	apiKey     string
 	apiTimeout int // in seconds
 }
 
 // NewAnthropic creates a new Anthropic client
 func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key cannot be empty")
+	}
+
 	client := anthropic.NewClient(
 		option.WithAPIKey(apiKey),
 	)
 
 	model := &AnthropicModel{
-		apiKey:     apiKey,
 		client:     client,
-		modelName:  "claude-3.7-sonnet", // Default model
-		maxTokens:  4000,                // Default max tokens
-		apiTimeout: 30,                  // Default timeout in seconds
+		modelName:  "claude-3-sonnet", // Default model
+		maxTokens:  4000,              // Default max tokens
+		apiTimeout: 30,                // Default timeout in seconds
 	}
 
 	// Apply options
@@ -58,33 +61,28 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(a.apiTimeout)*time.Second)
 	defer cancel()
 
-	var contentBlocks []anthropic.ContentBlockParamUnion
-
-	// Combine user content (prompt, diff, file contents)
-	contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.UserPrompt))
+	userContent := []string{req.UserPrompt}
 
 	if req.Diff != "" {
-		contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.Diff))
+		userContent = append(userContent, req.Diff)
 	}
 
 	if req.FileContents != "" {
-		contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.FileContents))
+		userContent = append(userContent, req.FileContents)
 	}
 
 	if req.LineLevelFeedback != "" {
-		contentBlocks = append(contentBlocks, anthropic.NewTextBlock(req.LineLevelFeedback))
+		userContent = append(userContent, req.LineLevelFeedback)
 	}
 
 	// Convert model name string to anthropic.Model
 	var model anthropic.Model
 	switch a.modelName {
-	case "claude-3.7-sonnet":
+	case "claude-3-sonnet":
 		model = anthropic.ModelClaude3_7SonnetLatest
-	case "claude-3.5-sonnet":
-		model = anthropic.ModelClaude3_5SonnetLatest
-	case "claude-3.5-haiku":
+	case "claude-3-haiku":
 		model = anthropic.ModelClaude3_5HaikuLatest
-	case "claude-4.0-sonnet":
+	case "claude-4-sonnet":
 		model = anthropic.ModelClaudeSonnet4_0
 	default:
 		model = anthropic.ModelClaude3_7SonnetLatest // Default fallback
@@ -99,8 +97,10 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 		},
 		Messages: []anthropic.MessageParam{
 			{
-				Role:    anthropic.MessageParamRoleUser,
-				Content: contentBlocks,
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					anthropic.NewTextBlock(strings.Join(userContent, "\n\n")),
+				},
 			},
 		},
 	}

@@ -13,14 +13,16 @@ type OpenAIModel struct {
 	client     *openai.Client
 	modelName  string
 	maxTokens  int
-	apiKey     string
 	apiTimeout int // in seconds
 }
 
 // NewOpenAI creates a new OpenAI client
 func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key cannot be empty")
+	}
+
 	model := &OpenAIModel{
-		apiKey:     apiKey,
 		client:     openai.NewClient(apiKey),
 		modelName:  "gpt-4.1", // Default model
 		maxTokens:  4000,      // Default max tokens
