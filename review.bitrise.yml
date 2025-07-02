@@ -1,0 +1,10 @@
+language: "en-US"
+tone_instructions: ""
+reviews:
+  profile: "chill"
+  summary: true
+  walkthrough: true
+  collapse_walkthrough: true
+  haiku: true
+  path_filters: ""
+  path_instructions: ""

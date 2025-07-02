@@ -23,24 +23,34 @@ func (s Summary) Header() string {
 }
 
 // String formats the complete summary as a markdown string
-func (s Summary) String() string {
-	if s.Summary == "" {
-		return s.InitiatedString()
-	}
-
+func (s Summary) String(settings Settings) string {
 	var builder strings.Builder
-	builder.WriteString(s.Header())
-	builder.WriteString("\n\n## Summary\n")
-	builder.WriteString(s.Summary)
+	builder.WriteString(s.Header() + "\n\n")
 
-	if len(s.Walkthrough) > 0 {
-		builder.WriteString("\n\n## Walkthrough\n")
-		builder.WriteString(formatWalkthrough(s.Walkthrough))
+	if settings.Reviews.CollapseWalkthrough {
+		builder.WriteString("<details>\n")
+		builder.WriteString("<summary>📝 Summary of changes</summary>\n\n")
 	}
 
-	if len(s.Haiku) > 0 {
-		builder.WriteString("\n\n## Haiku\n")
-		builder.WriteString(s.Haiku)
+	if settings.Reviews.Summary && len(s.Summary) > 0 {
+		builder.WriteString(s.Header())
+		builder.WriteString("\n\n## Summary\n")
+		builder.WriteString(s.Summary + "\n")
+	}
+
+	if settings.Reviews.Walkthrough && len(s.Walkthrough) > 0 {
+		builder.WriteString("\n\n## Walkthrough\n")
+		builder.WriteString(formatWalkthrough(s.Walkthrough) + "\n")
+	}
+
+	if settings.Reviews.CollapseWalkthrough {
+		builder.WriteString("</details>\n\n")
+	}
+
+	if settings.Reviews.Haiku && len(s.Haiku) > 0 {
+		builder.WriteString("---\n")
+		builder.WriteString("### Haiku\n")
+		builder.WriteString(s.Haiku + "\n")
 	}
 
 	return builder.String()

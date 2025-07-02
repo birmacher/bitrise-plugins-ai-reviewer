@@ -11,9 +11,11 @@ import (
 type LineLevel struct {
 	File           string `json:"file"`                  // Path to the file being commented on
 	Line           string `json:"content"`               // Content of the line being commented on
+	Category       string `json:"category,omitempty"`    // Category of the issue (e.g., "bug", "style", "performance")
 	LineNumber     int    `json:"line"`                  // Line number in the file
 	LastLineNumber int    `json:"last_line"`             // Last line number for multi-line comments
 	Suggestion     string `json:"suggestion,omitempty"`  // Suggested replacement for the line
+	Title          string `json:"title,omitempty"`       // Short title for the issue
 	Body           string `json:"issue"`                 // Main body of the review comment
 	CommitHash     string `json:"commit_hash,omitempty"` // Commit hash for the line being commented on
 }
@@ -43,11 +45,22 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 
 // String formats the complete comment with header, body and suggestion
 func (l LineLevel) String(client *git.Client, commitHash string) string {
-	body := l.Body
-	if len(l.Suggestion) > 0 {
-		body += fmt.Sprintf("\n\n**Suggestion:**\n```suggestion\n%s\n```\n", l.Suggestion)
+	if l.File == "" || l.LineNumber <= 0 || l.Body == "" {
+		return ""
 	}
-	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), body)
+
+	body := []string{}
+	if l.Category != "" {
+		body = append(body, fmt.Sprintf("_%s_", l.getCategoryString()))
+	}
+	if l.Title != "" {
+		body = append(body, fmt.Sprintf("**%s**", l.Title))
+	}
+	body = append(body, l.Body)
+	if len(l.Suggestion) > 0 {
+		body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
+	}
+	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), strings.Join(body, "\n\n"))
 }
 
 func (l LineLevel) StringForAssistant() string {
@@ -76,4 +89,43 @@ func (l LineLevel) LastLine() string {
 	}
 	lines := strings.Split(l.Line, "\n")
 	return lines[len(lines)-1]
+}
+
+func (l LineLevel) getCategoryString() string {
+	switch l.Category {
+	case "issue":
+		return "⚠️ Potential Issue"
+	case "refactor":
+		return "🔧 Refactor Suggestion"
+	case "improvement":
+		return "💡 Improvement"
+	case "documentation":
+		return "📚 Documentation"
+	case "nitpick":
+		return "📝 Nitpick"
+	case "test coverage":
+		return "🧪 Test Coverage"
+	}
+
+	return ""
+}
+
+func (llf LineLevelFeedback) GetNitpickFeedback() []LineLevel {
+	var nitpicks []LineLevel
+	for _, line := range llf.Lines {
+		if line.Category == "nitpick" {
+			nitpicks = append(nitpicks, line)
+		}
+	}
+	return nitpicks
+}
+
+func (llf LineLevelFeedback) GetLineFeedback() []LineLevel {
+	var feedback []LineLevel
+	for _, line := range llf.Lines {
+		if line.Category != "nitpick" {
+			feedback = append(feedback, line)
+		}
+	}
+	return feedback
 }
