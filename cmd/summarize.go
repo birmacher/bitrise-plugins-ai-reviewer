@@ -179,5 +179,7 @@ func init() {
 	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
 	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
 	// Settings
-	summarizeCmd.Flags().StringP("language", "l", "en-US", "Language for the review output (e.g., en-US, es-ES)")
+	summarizeCmd.Flags().StringP("language", "", "en-US", "Language for the review output (e.g., en-US, es-ES)")
+	summarizeCmd.Flags().StringP("tone", "", "", "Tone for the review output (e.g., Talk as Mr.T)")
+	summarizeCmd.Flags().StringP("profile", "", "chill", "Profile for the review tone ( e.g., chill, assertive )")
 }

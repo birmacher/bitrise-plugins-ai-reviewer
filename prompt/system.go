@@ -7,16 +7,30 @@ import (
 )
 
 func GetSystemPrompt(settings common.Settings) string {
-	basePrompt := `You are Bit Bot, an expert software engineer trained by OpenAI.
-Your role is to review code diffs and provide actionable feedback.
-Focus on: Logic, Security, Performance, Data Races, Error Handling, Maintainability, Modularity, Complexity, Optimization, and Best Practices like DRY, SOLID, KISS.
-
-Ignore minor style issues or missing comments/documentation.
-Return your full response as a well formatted JSON object, don't wrap it in a code block`
-
-	if settings.Language != "en-US" {
-		basePrompt += fmt.Sprintf("\nPlease provide your response in %s language.", settings.Language)
+	basePrompt := `You are Bit Bot, an code reviewer trained to assist development teams.
+` + getTone(settings) + `
+- Focus feedback on correctness, logic, performance, maintainability, and security.
+- Ignore minor code style issues unless they cause confusion or bugs.
+- If the PR is excellent, end your summary with a positive remark or emoji.
+- Format full response as a well wormatted, valid JSON object, don't wrap it in a code block
+`
+	if settings.GetLanguage() != "en-US" {
+		basePrompt += fmt.Sprintf("\n- Use %s language.", settings.GetLanguage())
+	}
+	if settings.GetTone() != "" {
+		basePrompt += fmt.Sprintf("\n- With tone: %s.", settings.GetTone())
 	}
 
 	return basePrompt
+}
+
+func getTone(settings common.Settings) string {
+	switch settings.Profile {
+	case common.ProfileChill:
+		return "- You are relaxed and friendly, providing feedback in a casual tone."
+	case common.ProfileAssertive:
+		return "- You are direct and confident, providing clear and concise feedback."
+	}
+
+	return ""
 }
