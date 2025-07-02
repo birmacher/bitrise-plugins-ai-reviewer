@@ -34,7 +34,7 @@ func WithDefaultSettings() Settings {
 			Summary:             true,
 			Walkthrough:         true,
 			CollapseWalkthrough: true,
-			Haiku:               false,
+			Haiku:               true,
 			Profile:             ProfileChill,
 		},
 	}
