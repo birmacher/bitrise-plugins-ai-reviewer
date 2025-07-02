@@ -7,12 +7,12 @@ import (
 )
 
 func GetSystemPrompt(settings common.Settings) string {
-	basePrompt := `You are Bit Bot, an code reviewer trained to assist development teams.
+	basePrompt := `You are Bit Bot, a code reviewer trained to assist development teams.
 ` + getTone(settings) + `
 - Focus feedback on correctness, logic, performance, maintainability, and security.
 - Ignore minor code style issues unless they cause confusion or bugs.
 - If the PR is excellent, end your summary with a positive remark or emoji.
-- Format full response as a well wormatted, valid JSON object, don't wrap it in a code block
+- Format full response as a well formatted, valid JSON object, don't wrap it in a code block
 `
 	if settings.GetLanguage() != "en-US" {
 		basePrompt += fmt.Sprintf("\n- Use %s language.", settings.GetLanguage())

@@ -22,10 +22,8 @@ var summarizeCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Running AI code review...")
 
-		settings := common.Settings{}
-		if language, _ := cmd.Flags().GetString("language"); language != "" {
-			settings = settings.WithLanguage(language)
-		}
+		// Parse settings from command line flags
+		settings := parseSettings(cmd)
 
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
@@ -182,4 +180,20 @@ func init() {
 	summarizeCmd.Flags().StringP("language", "", "en-US", "Language for the review output (e.g., en-US, es-ES)")
 	summarizeCmd.Flags().StringP("tone", "", "", "Tone for the review output (e.g., Talk as Mr.T)")
 	summarizeCmd.Flags().StringP("profile", "", "chill", "Profile for the review tone ( e.g., chill, assertive )")
+}
+
+func parseSettings(cmd *cobra.Command) common.Settings {
+	settings := common.Settings{}
+
+	if language, _ := cmd.Flags().GetString("language"); language != "" {
+		settings = settings.WithLanguage(language)
+	}
+	if tone, _ := cmd.Flags().GetString("tone"); tone != "" {
+		settings = settings.WithTone(tone)
+	}
+	if profile, _ := cmd.Flags().GetString("profile"); profile != "" {
+		settings = settings.WithProfile(profile)
+	}
+
+	return settings
 }
