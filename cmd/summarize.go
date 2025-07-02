@@ -49,7 +49,7 @@ var summarizeCmd = &cobra.Command{
 				return fmt.Errorf("failed to create Client for Review Provider: %v", err)
 			}
 
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, common.Summary{})
+			err = gitProvider.PostSummary(repoOwner, repoName, pr, common.Summary{}, settings)
 			if err != nil {
 				return fmt.Errorf("error posting review: %v", err)
 			}
@@ -117,7 +117,7 @@ var summarizeCmd = &cobra.Command{
 				return fmt.Errorf("error parsing summary response: %v", err)
 			}
 
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary)
+			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary, settings)
 			if err != nil {
 				return fmt.Errorf("error posting review: %v", err)
 			}
