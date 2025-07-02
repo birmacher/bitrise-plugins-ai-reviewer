@@ -24,10 +24,6 @@ func (s Summary) Header() string {
 
 // String formats the complete summary as a markdown string
 func (s Summary) String(settings Settings) string {
-	if s.Summary == "" {
-		return s.InitiatedString()
-	}
-
 	var builder strings.Builder
 	if settings.Reviews.CollapseWalkthrough {
 		builder.WriteString("<details>\n")
