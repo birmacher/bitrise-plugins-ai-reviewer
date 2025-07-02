@@ -15,7 +15,7 @@ Ignore minor style issues or missing comments/documentation.
 Return your full response as a well formatted JSON object, don't wrap it in a code block`
 
 	if settings.Language != "en-US" {
-basePrompt += fmt.Sprintf("\nPlease provide your response in %s language.", settings.Language)
+		basePrompt += fmt.Sprintf("\nPlease provide your response in %s language.", settings.Language)
 	}
 
 	return basePrompt
