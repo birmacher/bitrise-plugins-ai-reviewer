@@ -43,6 +43,22 @@ For GitHub Enterprise, you can configure the API URL:
 export GITHUB_API_URL=https://github.yourdomain.com
 ```
 
+## Settings
+
+### Language Preferences
+
+You can customize the language used for AI responses using the `--language` flag:
+
+```bash
+bitrise ai-reviewer summarize --language fr-FR --pr <PR_NUMBER> --repo <OWNER/REPO>
+```
+
+Supported language options:
+- `en-US` (default): English (United States)
+- Other ISO language codes like `es-ES` (Spanish), `fr-FR` (French), `de-DE` (German), etc.
+
+The AI will generate responses in the specified language while maintaining the same technical accuracy.
+
 ## Usage
 
 ### Review a Pull Request
@@ -68,6 +84,7 @@ bitrise ai-reviewer summarize --code-review github --branch master --pr <PR_NUMB
 - `--repo`: The GitHub repository in the format 'owner/repo'
 - `--branch`: Branch to review instead of a pull request
 - `--code-review`: Code review provider (e.g., 'github')
+- `--language`, `-l`: Language for AI responses (e.g., 'en-US', 'es-ES', 'fr-FR')
 
 ## Response Format
 

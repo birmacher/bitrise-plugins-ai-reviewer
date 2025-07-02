@@ -22,6 +22,11 @@ var summarizeCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Running AI code review...")
 
+		settings := common.Settings{}
+		if language, _ := cmd.Flags().GetString("language"); language != "" {
+			settings = settings.WithLanguage(language)
+		}
+
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
 
@@ -92,7 +97,7 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt:      prompt.GetSystemPrompt(),
+			SystemPrompt:      prompt.GetSystemPrompt(settings),
 			UserPrompt:        prompt.GetSummarizePrompt(),
 			Diff:              prompt.GetDiffPrompt(diff),
 			FileContents:      prompt.GetFileContentPrompt(fileContent),
@@ -173,5 +178,6 @@ func init() {
 	summarizeCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
 	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
 	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
-
+	// Settings
+	summarizeCmd.Flags().StringP("language", "l", "en-US", "Language for the review output (e.g., en-US, es-ES)")
 }
