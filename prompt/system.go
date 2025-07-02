@@ -7,24 +7,20 @@ import (
 )
 
 func GetSystemPrompt(settings common.Settings) string {
-	basePrompt := `You are Bit Bot, a code reviewer trained to assist development teams.
-` + getTone(settings) + `
+	basePrompt := getTone(settings) + `
+` + getProfile(settings) + `
 - Focus feedback on correctness, logic, performance, maintainability, and security.
 - Ignore minor code style issues unless they cause confusion or bugs.
 - If the PR is excellent, end your summary with a positive remark or emoji.
-- Format full response as a well formatted, valid JSON object, don't wrap it in a code block
-`
+- Format full response as a well formatted, valid JSON object, don't wrap it in a code block`
 	if settings.GetLanguage() != "en-US" {
 		basePrompt += fmt.Sprintf("\n- Use %s language.", settings.GetLanguage())
-	}
-	if settings.GetTone() != "" {
-		basePrompt += fmt.Sprintf("\n- With tone: %s.", settings.GetTone())
 	}
 
 	return basePrompt
 }
 
-func getTone(settings common.Settings) string {
+func getProfile(settings common.Settings) string {
 	switch settings.Profile {
 	case common.ProfileChill:
 		return "- You are relaxed and friendly, providing feedback in a casual tone."
@@ -33,4 +29,11 @@ func getTone(settings common.Settings) string {
 	}
 
 	return ""
+}
+
+func getTone(settings common.Settings) string {
+	if settings.Tone != "" {
+		return settings.GetTone()
+	}
+	return "You are Bit Bot, a code reviewer trained to assist development teams."
 }
