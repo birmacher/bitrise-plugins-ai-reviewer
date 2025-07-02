@@ -8,6 +8,7 @@ require (
 	github.com/sashabaranov/go-openai v1.40.3
 	github.com/spf13/cobra v1.9.1
 	golang.org/x/oauth2 v0.21.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

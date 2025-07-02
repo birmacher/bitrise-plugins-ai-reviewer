@@ -1,52 +1,61 @@
 package common
 
-import "fmt"
+import (
+	"os"
+
+	"gopkg.in/yaml.v3"
+)
 
 const (
 	ProfileChill     = "chill"
 	ProfileAssertive = "assertive"
 )
 
-// Settings holds application-wide configuration settings
+type Reviews struct {
+	Profile             string `yaml:"profile"`
+	Summary             bool   `yaml:"summary"`
+	Walkthrough         bool   `yaml:"walkthrough"`
+	CollapseWalkthrough bool   `yaml:"collapse_walkthrough"`
+	Haiku               bool   `yaml:"haiku"`
+	PathFilters         string `yaml:"path_filters"`
+	PathInstructions    string `yaml:"path_instructions"`
+}
+
 type Settings struct {
-	Language string
-	Profile  string
-	Tone     string
+	Language string  `yaml:"language"`
+	Tone     string  `yaml:"tone_instructions"`
+	Reviews  Reviews `yaml:"reviews"`
 }
 
-// WithLanguage sets the language in Settings and returns the updated Settings
-func (s Settings) WithLanguage(language string) Settings {
-	s.Language = language
-	return s
-}
-
-// GetLanguage returns the current language setting
-func (s Settings) GetLanguage() string {
-	return s.Language
-}
-
-// WithProfile sets the profile in Settings and returns the updated Settings
-func (s Settings) WithProfile(profile string) Settings {
-	if profile != ProfileChill && profile != ProfileAssertive {
-		fmt.Println("Invalid profile setting, defaulting to 'chill'")
-		profile = ProfileChill
+func WithDefaultSettings() Settings {
+	return Settings{
+		Language: "en-US",
+		Reviews: Reviews{
+			Summary:             true,
+			Walkthrough:         true,
+			CollapseWalkthrough: true,
+			Haiku:               false,
+			Profile:             ProfileChill,
+		},
 	}
-	s.Profile = profile
-	return s
 }
 
-// GetProfile returns the current profile setting
-func (s Settings) GetProfile() string {
-	return s.Profile
-}
+func WithYamlFile() Settings {
+	settings := WithDefaultSettings()
 
-// WithTone sets the tone in Settings and returns the updated Settings
-func (s Settings) WithTone(tone string) Settings {
-	s.Tone = tone
-	return s
-}
-
-// GetTone returns the current tone setting
-func (s Settings) GetTone() string {
-	return s.Tone
+	paths := []string{"review.bitrise.yml", "review.bitrise.yaml"}
+	var filePath string
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			filePath = p
+			break
+		}
+	}
+	if filePath != "" {
+		data, err := os.ReadFile(filePath)
+		if err == nil {
+			yaml.Unmarshal(data, &settings)
+		}
+	}
+	return settings
 }

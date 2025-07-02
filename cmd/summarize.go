@@ -96,7 +96,7 @@ var summarizeCmd = &cobra.Command{
 		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt:      prompt.GetSystemPrompt(settings),
-			UserPrompt:        prompt.GetSummarizePrompt(),
+			UserPrompt:        prompt.GetSummarizePrompt(settings),
 			Diff:              prompt.GetDiffPrompt(diff),
 			FileContents:      prompt.GetFileContentPrompt(fileContent),
 			LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),
@@ -183,16 +183,16 @@ func init() {
 }
 
 func parseSettings(cmd *cobra.Command) common.Settings {
-	settings := common.Settings{}
+	settings := common.WithYamlFile()
 
 	if language, _ := cmd.Flags().GetString("language"); language != "" {
-		settings = settings.WithLanguage(language)
+		settings.Language = language
 	}
 	if tone, _ := cmd.Flags().GetString("tone"); tone != "" {
-		settings = settings.WithTone(tone)
+		settings.Tone = tone
 	}
 	if profile, _ := cmd.Flags().GetString("profile"); profile != "" {
-		settings = settings.WithProfile(profile)
+		settings.Reviews.Profile = profile
 	}
 
 	return settings
