@@ -117,7 +117,7 @@ var summarizeCmd = &cobra.Command{
 				return fmt.Errorf("error parsing summary response: %v", err)
 			}
 
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary, settings)
+			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(settings))
 			if err != nil {
 				return fmt.Errorf("error posting review: %v", err)
 			}

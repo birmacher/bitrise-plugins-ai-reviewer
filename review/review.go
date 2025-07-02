@@ -56,7 +56,7 @@ func WithBaseURL(baseURL string) Option {
 
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
-	PostSummary(repoOwner, repoName string, pr int, summary common.Summary, settings common.Settings) error
+	PostSummary(repoOwner, repoName string, pr int, header, body string) error
 	PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error
 	GetReviewRequestComments(repoOwner, repoName string, pr int) ([]common.LineLevel, error)
 }

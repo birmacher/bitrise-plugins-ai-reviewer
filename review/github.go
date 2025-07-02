@@ -97,7 +97,7 @@ func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (in
 	return 0, nil
 }
 
-func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, summary common.Summary, settings common.Settings) error {
+func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
@@ -106,14 +106,13 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, summary common
 		return fmt.Errorf("failed to list existing comments: %w", err)
 	}
 
-	commentID, err := gh.getComment(comments, summary.Header())
+	commentID, err := gh.getComment(comments, header)
 	if err != nil {
 		return fmt.Errorf("failed to check existing comments: %w", err)
 	}
 
-	commentBody := summary.String(settings)
 	comment := &github.IssueComment{
-		Body: &commentBody,
+		Body: &body,
 	}
 
 	if commentID > 0 {
