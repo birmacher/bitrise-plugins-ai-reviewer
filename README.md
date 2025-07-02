@@ -45,20 +45,9 @@ export GITHUB_API_URL=https://github.yourdomain.com
 
 ## Settings
 
-### Language Preferences
-
-You can customize the language used for AI responses using the `--language` flag:
-
-```bash
-bitrise ai-reviewer summarize --language fr-FR --pr <PR_NUMBER> --repo <OWNER/REPO>
-```
-
-Supported language options:
-- `en-US` (default): English (United States)
-- Other ISO language codes like `es-ES` (Spanish), `fr-FR` (French), `de-DE` (German), etc.
-
-The AI will generate responses in the specified language while maintaining the same technical accuracy.
-
+* --language `en-US`, or other ISO language formats
+* --profile `chill`, or `assertive`
+* --tone to set the character and tone for the response
 ## Usage
 
 ### Review a Pull Request
