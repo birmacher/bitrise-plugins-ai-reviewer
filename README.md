@@ -43,11 +43,6 @@ For GitHub Enterprise, you can configure the API URL:
 export GITHUB_API_URL=https://github.yourdomain.com
 ```
 
-## Settings
-
-* --language `en-US`, or other ISO language formats
-* --profile `chill`, or `assertive`
-* --tone to set the character and tone for the response
 ## Usage
 
 ### Review a Pull Request
@@ -74,6 +69,8 @@ bitrise ai-reviewer summarize --code-review github --branch master --pr <PR_NUMB
 - `--branch`: Branch to review instead of a pull request
 - `--code-review`: Code review provider (e.g., 'github')
 - `--language`, `-l`: Language for AI responses (e.g., 'en-US', 'es-ES', 'fr-FR')
+- `--profile`: Get the response in a more `chill`, or `assertive` format
+- `--tone`: Tone to finetune the character and tone for the response
 
 ## Response Format
 
