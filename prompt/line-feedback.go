@@ -13,7 +13,10 @@ func GetLineLevelFeedbackPrompt(feedbacks []common.LineLevel) string {
 	for _, feedback := range feedbacks {
 		feedbackStr += feedback.StringForAssistant() + "\n\n"
 	}
-	return `Feedback already given in the PR comments:
+	return `===== LINE LEVEL FEEDBACK =====
+Feedback already given in the PR comments:
 
-` + feedbackStr
+` + feedbackStr + `
+
+===== LINE LEVEL FEEDBACK END =====`
 }

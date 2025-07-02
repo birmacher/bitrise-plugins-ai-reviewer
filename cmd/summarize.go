@@ -110,9 +110,8 @@ var summarizeCmd = &cobra.Command{
 		// Send to the review provider
 		if codeReviewerName != "" {
 			summary := common.Summary{}
-			err = json.Unmarshal([]byte(resp.Content), &summary)
-			if err != nil {
-				return fmt.Errorf("error parsing response: %v", err)
+			if err = json.Unmarshal([]byte(resp.Content), &summary); err != nil {
+				return fmt.Errorf("error parsing summary response: %v", err)
 			}
 
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary)
@@ -121,9 +120,8 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			lineLevel := common.LineLevelFeedback{}
-			err = json.Unmarshal([]byte(resp.Content), &lineLevel)
-			if err != nil {
-				return fmt.Errorf("error parsing response: %v", err)
+			if err = json.Unmarshal([]byte(resp.Content), &lineLevel); err != nil {
+				return fmt.Errorf("error parsing line-level response: %v", err)
 			}
 
 			for idx, ll := range lineLevel.Lines {
