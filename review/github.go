@@ -51,20 +51,16 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 		return nil, fmt.Errorf("API token is required for GitHub")
 	}
 
-	// Create GitHub client with OAuth and retry capability
+	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
+	standardClient := retryClient.StandardClient()
+
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: gh.apiToken})
 	tc := oauth2.NewClient(context.Background(), ts)
 
-	// Create a retryable client that will wrap the OAuth transport
-	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
-
-	// Create a standard client from the retry client and use its transport
-	standardClient := retryClient.StandardClient()
-
-	// First create the OAuth transport with token, then wrap it with the retry transport
-	oauthTransport := tc.Transport
-	retryClient.HTTPClient.Transport = oauthTransport
-	tc.Transport = standardClient.Transport
+	tc.Transport = &oauth2.Transport{
+		Source: ts,
+		Base:   standardClient.Transport,
+	}
 
 	if gh.baseURL != "" {
 		apiURL, err := url.JoinPath(gh.baseURL, "api/v3")
