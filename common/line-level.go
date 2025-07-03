@@ -115,7 +115,7 @@ func (l LineLevel) getCategoryString() string {
 	case CategoryDocumentation:
 		return "📚 Documentation"
 	case CategoryNitpick:
-		return "📝 Nitpick"
+		return "🧹 Nitpick"
 	case CategoryTestCoverage:
 		return "🧪 Test Coverage"
 	}
