@@ -8,6 +8,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 // AnthropicModel implements the LLM interface using Anthropic's API
@@ -24,8 +25,20 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 		return nil, fmt.Errorf("API key cannot be empty")
 	}
 
+	// Create retryable HTTP client with exponential backoff
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 3
+	retryClient.RetryWaitMin = 1 * time.Second
+	retryClient.RetryWaitMax = 5 * time.Second
+	retryClient.CheckRetry = retryablehttp.DefaultRetryPolicy
+
+	// Get standard HTTP client from retryable client
+	standardClient := retryClient.StandardClient()
+
+	// Create Anthropic client with retry capabilities
 	client := anthropic.NewClient(
 		option.WithAPIKey(apiKey),
+		option.WithHTTPClient(standardClient),
 	)
 
 	model := &AnthropicModel{
