@@ -152,5 +152,7 @@ func (ll LineLevel) getAIPrompt() string {
 	if ll.IsMultiline() {
 		line = fmt.Sprintf("lines %d and %d", ll.LineNumber, ll.LastLineNumber)
 	}
-	return fmt.Sprintf("In %s at %s, %s", ll.File, line, ll.Prompt)
+
+	result := fmt.Sprintf("In %s at %s, %s", ll.File, line, ll.Prompt)
+	return WrapString(result, 80)
 }
