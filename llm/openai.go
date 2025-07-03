@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-retryablehttp"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -23,12 +23,8 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 		return nil, fmt.Errorf("API key cannot be empty")
 	}
 
-	// Create retryable HTTP client with exponential backoff
-	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 3
-	retryClient.RetryWaitMin = 1 * time.Second
-	retryClient.RetryWaitMax = 5 * time.Second
-	retryClient.CheckRetry = retryablehttp.DefaultRetryPolicy
+	// Create retryable HTTP client with exponential backoff using common configuration
+	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
 
 	// Use the retryable client for OpenAI
 	config := openai.DefaultConfig(apiKey)

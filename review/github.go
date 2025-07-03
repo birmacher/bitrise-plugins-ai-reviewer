@@ -11,7 +11,6 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/google/go-github/v48/github"
-	"github.com/hashicorp/go-retryablehttp"
 	"golang.org/x/oauth2"
 )
 
@@ -51,13 +50,8 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	if gh.apiToken == "" {
 		return nil, fmt.Errorf("API token is required for GitHub")
 	}
-
-	// Create retryable HTTP client with exponential backoff
-	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 3
-	retryClient.RetryWaitMin = 1 * time.Second
-	retryClient.RetryWaitMax = 5 * time.Second
-	retryClient.CheckRetry = retryablehttp.DefaultRetryPolicy
+	// Create retryable HTTP client with exponential backoff using common configuration
+	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
 
 	// Create standardized client for OAuth
 	standardClient := retryClient.StandardClient()
