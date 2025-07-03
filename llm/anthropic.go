@@ -80,9 +80,9 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 		userContent = append(userContent, req.FileContents)
 	}
 
-	if req.LineLevelFeedback != "" {
-		userContent = append(userContent, req.LineLevelFeedback)
-	}
+	// if req.LineLevelFeedback != "" {
+	// 	userContent = append(userContent, req.LineLevelFeedback)
+	// }
 
 	// Convert model name string to anthropic.Model
 	var model anthropic.Model
