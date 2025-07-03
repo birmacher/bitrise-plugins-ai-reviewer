@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -22,8 +23,15 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 		return nil, fmt.Errorf("API key cannot be empty")
 	}
 
+	// Create retryable HTTP client with exponential backoff using common configuration
+	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
+
+	// Use the retryable client for OpenAI
+	config := openai.DefaultConfig(apiKey)
+	config.HTTPClient = retryClient.StandardClient()
+
 	model := &OpenAIModel{
-		client:     openai.NewClient(apiKey),
+		client:     openai.NewClientWithConfig(config),
 		modelName:  "gpt-4.1", // Default model
 		maxTokens:  4000,      // Default max tokens
 		apiTimeout: 30,        // Default timeout in seconds
@@ -84,13 +92,13 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		})
 	}
 
-	// Add line-level feedback if available
-	if req.LineLevelFeedback != "" {
-		messages = append(messages, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleAssistant,
-			Content: req.LineLevelFeedback,
-		})
-	}
+	// // Add line-level feedback if available
+	// if req.LineLevelFeedback != "" {
+	// 	messages = append(messages, openai.ChatCompletionMessage{
+	// 		Role:    openai.ChatMessageRoleAssistant,
+	// 		Content: req.LineLevelFeedback,
+	// 	})
+	// }
 
 	// Create the completion request
 	chatReq := openai.ChatCompletionRequest{
