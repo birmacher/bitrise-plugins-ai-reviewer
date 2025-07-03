@@ -68,7 +68,7 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 	}
 	body = append(body, l.Body)
 	if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
-		body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n```\n%s\n```\n</details>", l.Prompt))
+		body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n```\n%s\n```\n</details>", l.getAIPrompt()))
 	}
 	if len(l.Suggestion) > 0 {
 		body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
@@ -141,4 +141,16 @@ func (llf LineLevelFeedback) GetLineFeedback() []LineLevel {
 		}
 	}
 	return feedback
+}
+
+func (ll LineLevel) getAIPrompt() string {
+	if ll.Prompt == "" || ll.File == "" || ll.LineNumber <= 0 {
+		return ""
+	}
+
+	line := fmt.Sprintf("line %d", ll.LineNumber)
+	if ll.IsMultiline() {
+		line = fmt.Sprintf("lines %d and %d", ll.LineNumber, ll.LastLineNumber)
+	}
+	return fmt.Sprintf("In %s at %s, %s", ll.File, line, ll.Prompt)
 }
