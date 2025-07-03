@@ -155,13 +155,15 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	reviewComments := make([]*github.DraftReviewComment, 0)
+	nitpickComments := make([]string, 0)
+	nitpickCommentsByFile := make(map[string][]common.LineLevel)
 
 	addedComments, err := gh.GetReviewRequestComments(repoOwner, repoName, pr)
 	if err != nil {
 		return fmt.Errorf("failed to get existing review comments: %w", err)
 	}
 
-	for _, ll := range lineFeedback.Lines {
+	for _, ll := range lineFeedback.GetLineFeedback() {
 		skip := false
 
 		for _, existingComment := range addedComments {
@@ -204,14 +206,54 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		}
 
 		reviewComments = append(reviewComments, reviewComment)
+
+		// Todo: handle lines that is outside of the diff hunks
+	}
+
+	// Nitpick comment
+	for _, ll := range lineFeedback.GetNitpickFeedback() {
+		if ll.File == "" || ll.LineNumber <= 0 {
+			continue
+		}
+		if nitpickCommentsByFile[ll.File] == nil {
+			nitpickCommentsByFile[ll.File] = []common.LineLevel{}
+		}
+		nitpickCommentsByFile[ll.File] = append(nitpickCommentsByFile[ll.File], ll)
+	}
+
+	nitpickComment := strings.Builder{}
+	for filepath, comments := range nitpickCommentsByFile {
+		nitpickComment.WriteString("<details>\n")
+		nitpickComment.WriteString("<summary>" + filepath + " (" + strconv.Itoa(len(comments)) + ")</summary>\n\n")
+		for _, c := range comments {
+			line := fmt.Sprintf("%d", c.LineNumber)
+			if c.IsMultiline() {
+				line = line + "-" + fmt.Sprintf("%d", c.LastLineNumber)
+			}
+			nitpickComment.WriteString("<!-- bitrise-plugin-ai-reviewer: " + filepath + ":" + line + " -->\n")
+			nitpickComment.WriteString("`" + line + "`: **" + c.Title + "**\n\n")
+			nitpickComment.WriteString(c.Body + "\n\n")
+		}
+		nitpickComment.WriteString("</details>\n\n")
+
+		nitpickComments = append(nitpickComments, nitpickComment.String())
 	}
 
 	if len(reviewComments) > 0 {
-		overallReview := "This is an AI-generated review. Please review it carefully."
+		overallReview := strings.Builder{}
+		overallReview.WriteString("_This is an AI-generated review. Please review it carefully._\n\n")
+		overallReview.WriteString(fmt.Sprintf("**Actionable comments posted: %d**\n\n", len(reviewComments)))
+		if len(nitpickComments) > 0 {
+			overallReview.WriteString("<details>\n")
+			overallReview.WriteString("<summary>🧹 Nitpick comments</summary>\n")
+			overallReview.WriteString(strings.Join(nitpickComments, "\n\n---\n\n"))
+			overallReview.WriteString("</details>\n\n")
+		}
 
+		overallReviewStr := overallReview.String()
 		review := &github.PullRequestReviewRequest{
 			CommitID: &commitHash,
-			Body:     &overallReview,
+			Body:     &overallReviewStr,
 			Event:    github.String("COMMENT"),
 			Comments: reviewComments,
 		}
