@@ -218,6 +218,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		if nitpickCommentsByFile[ll.File] == nil {
 			nitpickCommentsByFile[ll.File] = []common.LineLevel{}
 		}
+		nitpickCommentsByFile[ll.File] = append(nitpickCommentsByFile[ll.File], ll)
 	}
 
 	nitpickComment := strings.Builder{}
@@ -241,12 +242,12 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	if len(reviewComments) > 0 {
 		overallReview := strings.Builder{}
 		overallReview.WriteString("_This is an AI-generated review. Please review it carefully._\n\n")
-		overallReview.WriteString(fmt.Sprintf("**Actionable comments posted: %d\n\n", len(reviewComments)))
+		overallReview.WriteString(fmt.Sprintf("**Actionable comments posted: %d**\n\n", len(reviewComments)))
 		if len(nitpickComments) > 0 {
 			overallReview.WriteString("<details>\n")
 			overallReview.WriteString("<summary>🧹 Nitpick comments</summary>\n")
 			overallReview.WriteString(strings.Join(nitpickComments, "\n\n---\n\n"))
-			overallReview.WriteString("<details>\n\n")
+			overallReview.WriteString("</details>\n\n")
 		}
 
 		overallReviewStr := overallReview.String()
