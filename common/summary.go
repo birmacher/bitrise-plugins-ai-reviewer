@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -75,7 +76,8 @@ func formatFilePaths(files string, maxLength int) string {
 		return ""
 	}
 
-	if len(files) <= maxLength || maxLength <= 3 {
+	if maxLength <= 3 {
+		fmt.Println("Warning: maxLength must be greater than 3 to allow truncation")
 		return files
 	}
 
