@@ -126,7 +126,7 @@ func (l LineLevel) getCategoryString() string {
 func (llf LineLevelFeedback) GetNitpickFeedback() []LineLevel {
 	var nitpicks []LineLevel
 	for _, line := range llf.Lines {
-		if line.Category == "nitpick" {
+		if line.Category == CategoryNitpick {
 			nitpicks = append(nitpicks, line)
 		}
 	}
@@ -136,7 +136,7 @@ func (llf LineLevelFeedback) GetNitpickFeedback() []LineLevel {
 func (llf LineLevelFeedback) GetLineFeedback() []LineLevel {
 	var feedback []LineLevel
 	for _, line := range llf.Lines {
-		if line.Category != "nitpick" {
+		if line.Category != CategoryNitpick {
 			feedback = append(feedback, line)
 		}
 	}
