@@ -7,6 +7,15 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 )
 
+const (
+	CategoryIssue         = "issue"
+	CategoryRefactor      = "refactor"
+	CategoryImprovement   = "improvement"
+	CategoryDocumentation = "documentation"
+	CategoryNitpick       = "nitpick"
+	CategoryTestCoverage  = "test coverage"
+)
+
 // LineLevel represents a review comment for a specific line of code
 type LineLevel struct {
 	File           string `json:"file"`                  // Path to the file being commented on
@@ -18,6 +27,7 @@ type LineLevel struct {
 	Title          string `json:"title,omitempty"`       // Short title for the issue
 	Body           string `json:"issue"`                 // Main body of the review comment
 	CommitHash     string `json:"commit_hash,omitempty"` // Commit hash for the line being commented on
+	Prompt         string `json:"prompt,omitempty"`      // Optional prompt for AI agents to fix the issue
 }
 
 // LineLevelFeedback represents a collection of line-level feedback items
@@ -50,13 +60,16 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 	}
 
 	body := []string{}
-	if l.Category != "" {
+	if len(l.getCategoryString()) > 0 {
 		body = append(body, fmt.Sprintf("_%s_", l.getCategoryString()))
 	}
 	if l.Title != "" {
 		body = append(body, fmt.Sprintf("**%s**", l.Title))
 	}
 	body = append(body, l.Body)
+	if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
+		body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n```\n%s\n```\n</details>", l.Prompt))
+	}
 	if len(l.Suggestion) > 0 {
 		body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
 	}
@@ -93,17 +106,17 @@ func (l LineLevel) LastLine() string {
 
 func (l LineLevel) getCategoryString() string {
 	switch l.Category {
-	case "issue":
+	case CategoryIssue:
 		return "⚠️ Potential Issue"
-	case "refactor":
+	case CategoryRefactor:
 		return "🔧 Refactor Suggestion"
-	case "improvement":
+	case CategoryImprovement:
 		return "💡 Improvement"
-	case "documentation":
+	case CategoryDocumentation:
 		return "📚 Documentation"
-	case "nitpick":
+	case CategoryNitpick:
 		return "📝 Nitpick"
-	case "test coverage":
+	case CategoryTestCoverage:
 		return "🧪 Test Coverage"
 	}
 
