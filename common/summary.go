@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -68,6 +69,37 @@ func (s Summary) InitiatedString() string {
 	return builder.String()
 }
 
+// formatFilePaths splits file paths by comma, truncates each if longer than maxLength,
+// and rejoins them with comma
+func formatFilePaths(files string, maxLength int) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	if maxLength <= 3 {
+		fmt.Println("Warning: maxLength must be greater than 3 to allow truncation")
+		return files
+	}
+
+	paths := strings.Split(files, ",")
+	for i, path := range paths {
+		path = strings.TrimSpace(path)
+		if len(path) > maxLength {
+			// Find the position to start truncating from
+			truncStart := len(path) - maxLength + 3
+			if truncStart < 0 {
+				paths[i] = path
+			} else {
+				paths[i] = "..." + path[truncStart:]
+			}
+		} else {
+			paths[i] = path
+		}
+	}
+
+	return strings.Join(paths, ", ")
+}
+
 // formatWalkthrough creates a markdown table from walkthrough data
 func formatWalkthrough(walkthrough []Walkthrough) string {
 	if len(walkthrough) == 0 {
@@ -80,7 +112,7 @@ func formatWalkthrough(walkthrough []Walkthrough) string {
 
 	for _, w := range walkthrough {
 		builder.WriteString("| ")
-		builder.WriteString(w.Files)
+		builder.WriteString(formatFilePaths(w.Files, 40))
 		builder.WriteString(" | ")
 		builder.WriteString(w.Summary)
 		builder.WriteString(" |\n")
