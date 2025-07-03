@@ -75,13 +75,21 @@ func formatFilePaths(files string, maxLength int) string {
 		return ""
 	}
 
+	if len(files) <= maxLength || maxLength <= 3 {
+		return files
+	}
+
 	paths := strings.Split(files, ",")
 	for i, path := range paths {
 		path = strings.TrimSpace(path)
 		if len(path) > maxLength {
 			// Find the position to start truncating from
-			truncStart := len(path) - maxLength + 3 // 3 for "..."
-			paths[i] = "..." + path[truncStart:]
+			truncStart := len(path) - maxLength + 3
+			if truncStart < 0 {
+				paths[i] = path
+			} else {
+				paths[i] = "..." + path[truncStart:]
+			}
 		} else {
 			paths[i] = path
 		}
