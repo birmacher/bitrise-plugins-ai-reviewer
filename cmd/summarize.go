@@ -207,7 +207,7 @@ var summarizeCmd = &cobra.Command{
 
 					suggestionLines := strings.Split(lineLevel.Lines[idx].Suggestion, "\n")
 
-					logger.Debugf("%s - base line", lineLevel.Lines[idx].Suggestion)
+					logger.Debugf("%s - base line", ll.FirstLine())
 					logger.Debugf("%s - suggestion line", suggestionLines[0])
 
 					indentation := common.GetIndentation(ll.FirstLine())
