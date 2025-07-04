@@ -192,11 +192,12 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			return fmt.Errorf("failed to check existing comments: %w", err)
 		}
 
-		if commentID > 0 {
+		if ll.File == "" || ll.LineNumber <= 0 {
 			continue
 		}
 
-		if ll.File == "" || ll.LineNumber <= 0 {
+		if commentID > 0 {
+			// Todo: Check if blame the same, if so continue
 			continue
 		}
 
@@ -213,8 +214,6 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		}
 
 		reviewComments = append(reviewComments, reviewComment)
-
-		// Todo: handle lines that is outside of the diff hunks
 	}
 
 	// Nitpick comment
