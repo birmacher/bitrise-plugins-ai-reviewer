@@ -135,21 +135,21 @@ var summarizeCmd = &cobra.Command{
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
 				lastLineNumber := 0
 
-				if err != nil {
+				if err != nil || lineNumber <= 0 {
 					firstLineFound = false
-					fmt.Printf("Error getting first line number for file %s: %v\n", ll.File, err)
+					fmt.Printf("Error finding first line '%s' in file %s: %v\n", ll.FirstLine(), ll.File, err)
 				}
 
 				if ll.IsMultiline() {
 					lastLineNumber, err = common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
-					if err != nil {
+					if err != nil || lastLineNumber <= 0 {
 						lastLineFound = false
-						fmt.Printf("Error getting last line number for file %s: %v\n", ll.File, err)
+						fmt.Printf("Error finding last line '%s' in file %s: %v\n", ll.LastLine(), ll.File, err)
 					}
 				}
 
 				if !firstLineFound && !lastLineFound {
-					fmt.Printf("Skipping line for file %s, no valid line numbers found\n", ll.File)
+					fmt.Printf("⚠️ Skipping review for file %s, no valid line numbers found in diff\n", ll.File)
 					continue
 				}
 
