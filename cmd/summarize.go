@@ -129,25 +129,43 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			for idx, ll := range lineLevel.Lines {
+				var err error
+
+				firstLineFound := true
+				lastLineFound := true
+
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
+				lastLineNumber := 0
+
 				if err != nil {
-					fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
-					continue
+					firstLineFound = false
+					fmt.Printf("Error getting first line number for file %s: %v\n", ll.File, err)
 				}
-				lineLevel.Lines[idx].LineNumber = lineNumber
-				lineLevel.Lines[idx].LastLineNumber = lineNumber
 
 				if ll.IsMultiline() {
-					lastLineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
+					lastLineNumber, err = common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
 					if err != nil {
-						fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
-						continue
+						lastLineFound = false
+						fmt.Printf("Error getting last line number for file %s: %v\n", ll.File, err)
 					}
+				}
 
-					if lastLineNumber > lineLevel.Lines[idx].LineNumber {
-						lineLevel.Lines[idx].LastLineNumber = lastLineNumber
+				if !firstLineFound && !lastLineFound {
+					fmt.Printf("Skipping line for file %s, no valid line numbers found\n", ll.File)
+					continue
+				}
+
+				if firstLineFound {
+					lineLevel.Lines[idx].LineNumber = lineNumber
+					if ll.IsMultiline() && lastLineFound {
+						if lastLineNumber > lineLevel.Lines[idx].LineNumber {
+							lineLevel.Lines[idx].LastLineNumber = lastLineNumber
+						}
 					}
+				}
 
+				if !firstLineFound && ll.IsMultiline() && lastLineFound {
+					lineLevel.Lines[idx].LineNumber = lastLineNumber
 				}
 			}
 
