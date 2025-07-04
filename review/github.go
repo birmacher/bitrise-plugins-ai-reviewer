@@ -173,6 +173,10 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	for _, ll := range lineFeedback.GetLineFeedback() {
 		skip := false
 
+		if ll.File == "" || ll.LineNumber <= 0 {
+			continue
+		}
+
 		for _, existingComment := range addedComments {
 			if ll.File == existingComment.File &&
 				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber {
@@ -186,18 +190,17 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
-		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
+		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
+		if err != nil {
+			return fmt.Errorf("failed to get blame for line: %w", err)
+		}
 
+		commentID, err := gh.getComment(comments, ll.Header(client, blame))
 		if err != nil {
 			return fmt.Errorf("failed to check existing comments: %w", err)
 		}
 
-		if ll.File == "" || ll.LineNumber <= 0 {
-			continue
-		}
-
 		if commentID > 0 {
-			// Todo: Check if blame the same, if so continue
 			continue
 		}
 
