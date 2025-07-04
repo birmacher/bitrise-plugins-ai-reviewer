@@ -92,6 +92,13 @@ func GetIndentationString(fileSource string) string {
 }
 
 func GetIndentationForLine(line string) string {
+	for i, c := range line {
+		if c != ' ' && c != '\t' {
+			return line[:i]
+		}
+	}
+	return line
+}
 	return strings.TrimLeft(line, " \t")
 }
 
