@@ -177,9 +177,15 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
+		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
+		if err != nil {
+			return fmt.Errorf("failed to get blame for line: %w", err)
+		}
+
 		for _, existingComment := range addedComments {
 			if ll.File == existingComment.File &&
-				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber {
+				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
+				blame == existingComment.CommitHash {
 				fmt.Println("Skipping existing comment for file:", ll.File, "line:", ll.LineNumber)
 				skip = true
 				break
@@ -190,12 +196,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
-		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
-		if err != nil {
-			return fmt.Errorf("failed to get blame for line: %w", err)
-		}
-
-		commentID, err := gh.getComment(comments, ll.Header(client, blame))
+		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
 		if err != nil {
 			return fmt.Errorf("failed to check existing comments: %w", err)
 		}
