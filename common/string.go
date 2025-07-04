@@ -94,15 +94,6 @@ func GetIndentationString(fileSource string) string {
 	return strings.Repeat(indentationType, indentationCount)
 }
 
-func GetIndentationForLine(line string) string {
-	for i, c := range line {
-		if c != ' ' && c != '\t' {
-			return line[:i]
-		}
-	}
-	return ""
-}
-
 func ReplaceTabIndentation(input, indentation, prefix string) string {
 	if input == "" || indentation == "" {
 		return input

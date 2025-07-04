@@ -219,7 +219,7 @@ var summarizeCmd = &cobra.Command{
 						logger.Errorf(errMsg)
 						return errors.New(errMsg)
 					}
-					baseIndentation := common.GetIndentationForLine(originalLine)
+					baseIndentation := common.GetIndentation(originalLine)
 
 					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
 				}
