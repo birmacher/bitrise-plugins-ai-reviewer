@@ -203,10 +203,18 @@ var summarizeCmd = &cobra.Command{
 
 				// Fix indentation for suggestions
 				if lineLevel.Lines[idx].Suggestion != "" {
+					logger.Debugf("Fixing indentation for suggestion in line %d of file %s", lineLevel.Lines[idx].LineNumber, ll.File)
+
 					suggestionLines := strings.Split(lineLevel.Lines[idx].Suggestion, "\n")
+
+					logger.Debugf("%s - base line", lineLevel.Lines[idx].Suggestion)
+					logger.Debugf("%s - suggestion line", suggestionLines[0])
 
 					indentation := common.GetIndentation(ll.FirstLine())
 					baseIndentationForSuggestion := common.GetIndentation(lineLevel.Lines[idx].Suggestion)
+
+					logger.Debugf("'%s' - indentation", indentation)
+					logger.Debugf("'%s' - baseIndentation", baseIndentationForSuggestion)
 
 					for i, line := range suggestionLines {
 						suggestionLines[i] = indentation + line[len(baseIndentationForSuggestion):]
