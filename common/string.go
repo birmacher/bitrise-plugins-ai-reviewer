@@ -97,7 +97,7 @@ func GetIndentationForLine(line string) string {
 			return line[:i]
 		}
 	}
-	return line
+	return ""
 }
 
 func ReplaceTabIndentation(input, indentation, prefix string) string {
