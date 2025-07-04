@@ -231,6 +231,8 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
 				blame == existingComment.CommitHash {
 				logger.Infof("Skipping existing comment for file: %s, line: %d", ll.File, ll.LineNumber)
+				logger.Debugf("Existing comment:	line number: %d, last line number: %d, commit hash: %s", existingComment.LineNumber, existingComment.LastLineNumber, existingComment.CommitHash)
+				logger.Debugf("Line feedback: 		line number: %d, last line number: %d, commit hash: %s", ll.LineNumber, ll.LastLineNumber, blame)
 				skip = true
 				break
 			}

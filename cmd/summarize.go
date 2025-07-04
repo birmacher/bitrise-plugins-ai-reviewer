@@ -161,6 +161,7 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			for idx, ll := range lineLevel.Lines {
+				// Get the line numbers
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
 				var lastLineNumber int
 
@@ -199,6 +200,28 @@ var summarizeCmd = &cobra.Command{
 					// Clear suggestion as we have moved the starting line number
 					// and it won't be correct anymore
 					lineLevel.Lines[idx].Suggestion = ""
+				}
+
+				// Get the file content to look up indentation
+				if ll.Suggestion != "" {
+					fileSource, err := common.GetFileContentFromString(fileContent, ll.File)
+					if err != nil {
+						errMsg := fmt.Sprintf("Error getting file content for '%s': %v", ll.File, err)
+						logger.Errorf(errMsg)
+						return errors.New(errMsg)
+					}
+					indentation := common.GetIndentationString(fileSource)
+					logger.Debug("Detected indentation '", indentation, "' for file ", ll.File)
+
+					originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
+					if err != nil {
+						errMsg := fmt.Sprintf("Error getting original line for '%s': %v", ll.FirstLine(), err)
+						logger.Errorf(errMsg)
+						return errors.New(errMsg)
+					}
+					baseIndentation := common.GetIndentation(originalLine)
+
+					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
 				}
 			}
 

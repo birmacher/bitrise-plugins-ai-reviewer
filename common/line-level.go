@@ -157,7 +157,7 @@ func (ll LineLevel) getAIPrompt() string {
 	}
 
 	line := fmt.Sprintf("line %d", ll.LineNumber)
-	if ll.IsMultiline() {
+	if ll.IsMultiline() && ll.LastLineNumber > ll.LineNumber {
 		line = fmt.Sprintf("lines %d and %d", ll.LineNumber, ll.LastLineNumber)
 	}
 
