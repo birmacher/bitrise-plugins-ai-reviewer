@@ -16,10 +16,28 @@ type ChangedLine struct {
 	LineContent string
 }
 
+func GetOriginalLine(fileName string, fileContent []byte, diffContent []byte, matchLine string) (string, error) {
+	fileContentStr, err := GetFileContentFromString(string(fileContent), fileName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get file content for '%s': %w", fileName, err)
+	}
+
+	matches := getMatchingLines([]byte(fileContentStr), matchLine)
+	changed := parseDiffChangedLines(diffContent, fileName)
+
+	for _, ln := range matches {
+		if changed[ln] {
+			return strings.Split(fileContentStr, "\n")[ln-1], nil
+		}
+	}
+
+	return "", fmt.Errorf("line '%s' not found in the diff", matchLine)
+}
+
 // GetLineNumber finds the line number of a matching line in the changed file
 // It returns the line number if found in the diff, or an error if not found
 func GetLineNumber(fileName string, fileContent []byte, diffContent []byte, matchLine string) (int, error) {
-	fileContentStr, err := getFileContentFromString(string(fileContent), fileName)
+	fileContentStr, err := GetFileContentFromString(string(fileContent), fileName)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get file content for '%s': %w", fileName, err)
 	}
@@ -36,9 +54,9 @@ func GetLineNumber(fileName string, fileContent []byte, diffContent []byte, matc
 	return 0, fmt.Errorf("line '%s' not found in the diff", matchLine)
 }
 
-// getFileContentFromString extracts content for a specific file from a multi-file string representation
+// GetFileContentFromString extracts content for a specific file from a multi-file string representation
 // Each file is expected to be prefixed with "===== FILE: filename ====="
-func getFileContentFromString(input string, targetFile string) (string, error) {
+func GetFileContentFromString(input string, targetFile string) (string, error) {
 	lines := strings.Split(input, "\n")
 
 	var currentFile string

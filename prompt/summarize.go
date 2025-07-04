@@ -15,8 +15,9 @@ A list of issues found in the diff hunks. Return the file ("file"), short title 
 Only include lines that appear in the diff hunk. Do not make up lines.
 Quote the entire target line exactly as it appears in the diff.
 Don't comment on lines that you already gave suggestion on.
-If you are sure how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content. Suggestions should be valid code, with the right indentation, not just placeholder comments.
-If you can add a Prompt to AI Agents section as "prompt" field. This should be a short, clear instruction for an AI agent to fix the issue. Don't include the file or line number in the prompt, just the prompt itself.
+Add a Prompt to AI Agents as "prompt" field. This should be a short, clear instruction for an AI agent to fix the issue. Don't include the file or line number in the prompt, just the prompt itself.
+If you know how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content. Suggestions should be valid code, always with "\t" indentation. Avoid adding just comments.
+
 Focus on bugs, smells, security issues, and code quality improvements.
 Categorize the issues as "issue", "refactor", improvement, "documentation", "nitpick", "test coverage"
 ` + getHaiku(settings) + `
