@@ -1,11 +1,13 @@
 package review
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 const (
@@ -65,19 +67,26 @@ type Reviewer interface {
 func getAPIToken() (string, error) {
 	apiToken := os.Getenv("GITHUB_TOKEN")
 	if apiToken == "" {
-		return "", fmt.Errorf("GITHUB_TOKEN environment variable is not set")
+		errMsg := "GITHUB_TOKEN environment variable is not set"
+		logger.Error(errMsg)
+		return "", errors.New(errMsg)
 	}
+	logger.Debug("Successfully retrieved GitHub API token")
 	return apiToken, nil
 }
 
 // NewReviewer creates a new review provider client
 func NewReviewer(providerName string, opts ...Option) (Reviewer, error) {
+	logger.Infof("Creating new reviewer with provider: %s", providerName)
+
 	var reviewer Reviewer
 	var err error
 
 	apiToken, err := getAPIToken()
 	if err != nil {
-		return nil, err
+		errMsg := fmt.Sprintf("Failed to get API token: %v", err)
+		logger.Errorf(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	options := []Option{
@@ -87,6 +96,7 @@ func NewReviewer(providerName string, opts ...Option) (Reviewer, error) {
 
 	// Check for GitHub Enterprise URL
 	if githubURL := os.Getenv("GITHUB_API_URL"); githubURL != "" && providerName == ProviderGitHub {
+		logger.Infof("Using GitHub Enterprise URL: %s", githubURL)
 		options = append(options, WithBaseURL(githubURL))
 	}
 
@@ -94,14 +104,18 @@ func NewReviewer(providerName string, opts ...Option) (Reviewer, error) {
 
 	switch providerName {
 	case ProviderGitHub:
+		logger.Debug("Initializing GitHub reviewer")
 		reviewer, err = NewGitHub(options...)
 	default:
-		err = fmt.Errorf("unsupported review provider: %s", providerName)
+		errMsg := fmt.Sprintf("unsupported review provider: %s", providerName)
+		logger.Error(errMsg)
+		err = errors.New(errMsg)
 	}
 
 	if err == nil {
-		fmt.Println("")
-		fmt.Println("Using Review Provider:", providerName)
+		logger.Infof("Successfully created reviewer with provider: %s", providerName)
+	} else {
+		logger.Errorf("Failed to create reviewer: %v", err)
 	}
 
 	return reviewer, err

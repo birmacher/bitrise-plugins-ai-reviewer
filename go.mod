@@ -8,6 +8,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/sashabaranov/go-openai v1.40.3
 	github.com/spf13/cobra v1.9.1
+	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.21.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -21,5 +22,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 )

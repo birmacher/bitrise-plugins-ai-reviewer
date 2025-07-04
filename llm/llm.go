@@ -1,8 +1,11 @@
 package llm
 
 import (
+	"errors"
 	"fmt"
 	"os"
+
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 const (
@@ -74,17 +77,23 @@ type LLM interface {
 func getAPIKey() (string, error) {
 	apiKey := os.Getenv("LLM_API_KEY")
 	if apiKey == "" {
-		return "", fmt.Errorf("LLM_API_KEY environment variable is not set")
+		errMsg := "LLM_API_KEY environment variable is not set"
+		logger.Error(errMsg)
+		return "", errors.New(errMsg)
 	}
+	logger.Debug("Successfully retrieved LLM API key")
 	return apiKey, nil
 }
 
 func NewLLM(providerName, modelName string, opts ...Option) (LLM, error) {
+	logger.Infof("Creating new LLM client with provider: %s, model: %s", providerName, modelName)
+
 	var llmClient LLM
 	var err error
 
 	apiKey, err := getAPIKey()
 	if err != nil {
+		logger.Errorf("Failed to get API key: %v", err)
 		return nil, err
 	}
 
@@ -94,20 +103,23 @@ func NewLLM(providerName, modelName string, opts ...Option) (LLM, error) {
 		WithAPITimeout(60),
 	}
 	options = append(options, opts...)
-
 	switch providerName {
 	case ProviderOpenAI:
+		logger.Debug("Initializing OpenAI client")
 		llmClient, err = NewOpenAI(apiKey, options...)
 	case ProviderAnthropic:
+		logger.Debug("Initializing Anthropic client")
 		llmClient, err = NewAnthropic(apiKey, options...)
 	default:
-		err = fmt.Errorf("unsupported provider: %s", providerName)
+		errMsg := fmt.Sprintf("unsupported provider: %s", providerName)
+		logger.Error(errMsg)
+		err = errors.New(errMsg)
 	}
 
 	if err == nil {
-		fmt.Println("")
-		fmt.Println("Using LLM Provider:", providerName)
-		fmt.Println("With Model:", modelName)
+		logger.Infof("Successfully created LLM client with provider: %s, model: %s", providerName, modelName)
+	} else {
+		logger.Errorf("Failed to create LLM client: %v", err)
 	}
 
 	return llmClient, err
