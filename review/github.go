@@ -342,7 +342,7 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 	reviews, _, err := gh.client.PullRequests.ListReviews(ctx, repoOwner, repoName, pr, nil)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to list reviews: %v", err)
-		fmt.Println(errMsg)
+		logger.Errorf(errMsg)
 		return nil, errors.New(errMsg)
 	}
 
