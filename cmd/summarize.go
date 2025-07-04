@@ -161,28 +161,6 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			for idx, ll := range lineLevel.Lines {
-				// Get the file content to look up indentation
-				fileSource, err := common.GetFileContentFromString(fileContent, ll.File)
-				if err != nil {
-					errMsg := fmt.Sprintf("Error getting file content for '%s': %v", ll.File, err)
-					logger.Errorf(errMsg)
-					return errors.New(errMsg)
-				}
-				indentation := common.GetIndentationString(fileSource)
-				logger.Debug("Detected indentation '", indentation, "' for file ", ll.File)
-
-				originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
-				if err != nil {
-					errMsg := fmt.Sprintf("Error getting original line for '%s': %v", ll.FirstLine(), err)
-					logger.Errorf(errMsg)
-					return errors.New(errMsg)
-				}
-				baseIndentation := common.GetIndentationForLine(originalLine)
-
-				if ll.Suggestion != "" {
-					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
-				}
-
 				// Get the line numbers
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
 				var lastLineNumber int
@@ -224,26 +202,26 @@ var summarizeCmd = &cobra.Command{
 					lineLevel.Lines[idx].Suggestion = ""
 				}
 
-				// Fix indentation for suggestions
-				if lineLevel.Lines[idx].Suggestion != "" {
-					logger.Debugf("Fixing indentation for suggestion in line %d of file %s", lineLevel.Lines[idx].LineNumber, ll.File)
-
-					suggestionLines := strings.Split(lineLevel.Lines[idx].Suggestion, "\n")
-
-					logger.Debugf("%s - base line", ll.FirstLine())
-					logger.Debugf("%s - suggestion line", suggestionLines[0])
-
-					indentation := common.GetIndentation(ll.FirstLine())
-					baseIndentationForSuggestion := common.GetIndentation(lineLevel.Lines[idx].Suggestion)
-
-					logger.Debugf("'%s' - indentation", indentation)
-					logger.Debugf("'%s' - baseIndentation", baseIndentationForSuggestion)
-
-					for i, line := range suggestionLines {
-						suggestionLines[i] = indentation + line[len(baseIndentationForSuggestion):]
+				// Get the file content to look up indentation
+				if ll.Suggestion != "" {
+					fileSource, err := common.GetFileContentFromString(fileContent, ll.File)
+					if err != nil {
+						errMsg := fmt.Sprintf("Error getting file content for '%s': %v", ll.File, err)
+						logger.Errorf(errMsg)
+						return errors.New(errMsg)
 					}
-					lineLevel.Lines[idx].Suggestion = strings.Join(suggestionLines, "\n")
+					indentation := common.GetIndentationString(fileSource)
+					logger.Debug("Detected indentation '", indentation, "' for file ", ll.File)
 
+					originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
+					if err != nil {
+						errMsg := fmt.Sprintf("Error getting original line for '%s': %v", ll.FirstLine(), err)
+						logger.Errorf(errMsg)
+						return errors.New(errMsg)
+					}
+					baseIndentation := common.GetIndentationForLine(originalLine)
+
+					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
 				}
 			}
 
