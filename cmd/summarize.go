@@ -206,7 +206,10 @@ var summarizeCmd = &cobra.Command{
 					indentation := strings.TrimRight(ll.FirstLine(), strings.TrimLeft(ll.FirstLine(), " \t"))
 
 					suggestionLines := strings.Split(lineLevel.Lines[idx].Suggestion, "\n")
-					firstSuggestionIndentation := strings.TrimRight(suggestionLines[0], strings.TrimLeft(suggestionLines[0], " \t"))
+					firstSuggestionIndentation := ""
+					if len(suggestionLines) > 0 {
+						firstSuggestionIndentation = strings.TrimRight(suggestionLines[0], strings.TrimLeft(suggestionLines[0], " \t"))
+					}
 					for i, line := range suggestionLines {
 						suggestionLines[i] = indentation + line[len(firstSuggestionIndentation):]
 					}
