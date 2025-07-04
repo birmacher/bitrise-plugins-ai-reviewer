@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 	"github.com/google/go-github/v48/github"
 	"golang.org/x/oauth2"
 )
@@ -24,6 +26,8 @@ type GitHub struct {
 
 // NewGitHub creates a new GitHub reviewer client
 func NewGitHub(opts ...Option) (Reviewer, error) {
+	logger.Debug("Creating new GitHub reviewer client")
+
 	gh := &GitHub{
 		timeout: 60, // Default timeout
 	}
@@ -34,21 +38,26 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 		case APITokenOption:
 			if token, ok := opt.Value.(string); ok {
 				gh.apiToken = token
+				logger.Debug("GitHub API token configured")
 			}
 		case TimeoutOption:
 			if timeout, ok := opt.Value.(int); ok {
 				gh.timeout = timeout
+				logger.Debugf("GitHub API timeout set to %d seconds", timeout)
 			}
 		case BaseURLOption:
 			if baseURL, ok := opt.Value.(string); ok {
 				gh.baseURL = baseURL
+				logger.Debugf("GitHub Enterprise base URL configured: %s", baseURL)
 			}
 		}
 	}
 
 	// Validate required options
 	if gh.apiToken == "" {
-		return nil, fmt.Errorf("API token is required for GitHub")
+		errMsg := "GitHub API token is required"
+		logger.Error(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
@@ -63,23 +72,31 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	}
 
 	if gh.baseURL != "" {
+		logger.Infof("Using GitHub Enterprise URL: %s", gh.baseURL)
 		apiURL, err := url.JoinPath(gh.baseURL, "api/v3")
 		if err != nil {
-			return nil, fmt.Errorf("failed to join API URL path: %w", err)
+			errMsg := fmt.Sprintf("Failed to join API URL path: %v", err)
+			logger.Errorf(errMsg)
+			return nil, errors.New(errMsg)
 		}
 		uploadsURL, err := url.JoinPath(gh.baseURL, "uploads")
 		if err != nil {
-			return nil, fmt.Errorf("failed to join uploads URL path: %w", err)
+			errMsg := fmt.Sprintf("Failed to join uploads URL path: %v", err)
+			logger.Errorf(errMsg)
+			return nil, errors.New(errMsg)
 		}
 		client, err := github.NewEnterpriseClient(apiURL, uploadsURL, tc)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create GitHub Enterprise client: %w", err)
+			errMsg := fmt.Sprintf("Failed to create GitHub Enterprise client: %v", err)
+			logger.Error(errMsg)
+			return nil, errors.New(errMsg)
 		}
 		gh.client = client
 	} else {
 		gh.client = github.NewClient(tc)
 	}
 
+	logger.Debug("GitHub reviewer client created successfully")
 	return gh, nil
 }
 
@@ -105,17 +122,24 @@ func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (in
 }
 
 func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body string) error {
+	logger.Infof("Posting summary to PR #%d in %s/%s", pr, repoOwner, repoName)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
+	logger.Debug("Fetching existing comments to check for duplicates")
 	comments, err := gh.getComments(ctx, repoOwner, repoName, pr)
 	if err != nil {
-		return fmt.Errorf("failed to list existing comments: %w", err)
+		errMsg := fmt.Sprintf("Failed to list existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	commentID, err := gh.getComment(comments, header)
 	if err != nil {
-		return fmt.Errorf("failed to check existing comments: %w", err)
+		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	comment := &github.IssueComment{
@@ -123,6 +147,7 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 	}
 
 	if commentID > 0 {
+		logger.Debugf("Found existing comment with ID: %d. Updating it", commentID)
 		_, _, err = gh.client.Issues.EditComment(
 			ctx,
 			repoOwner,
@@ -132,8 +157,11 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 		)
 
 		if err != nil {
-			return fmt.Errorf("failed to update existing summary comment: %w", err)
+			errMsg := fmt.Sprintf("Failed to update existing summary comment: %v", err)
+			logger.Error(errMsg)
+			return errors.New(errMsg)
 		}
+		logger.Infof("Updated existing summary comment for PR #%d in %s/%s", pr, repoOwner, repoName)
 	} else {
 		_, _, err = gh.client.Issues.CreateComment(
 			ctx,
@@ -144,49 +172,65 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 		)
 
 		if err != nil {
-			return fmt.Errorf("failed to post summary comment: %w", err)
+			errMsg := fmt.Sprintf("Failed to post summary comment: %v", err)
+			logger.Error(errMsg)
+			return errors.New(errMsg)
 		}
+		logger.Infof("Posted new summary comment for PR %d in %s/%s", pr, repoOwner, repoName)
 	}
 
 	return nil
 }
 
 func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error {
+	logger.Infof("Posting line feedback to PR #%d in %s/%s, commit: %s", pr, repoOwner, repoName, commitHash)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
 	defer cancel()
 
 	// Check for existing comments
+	logger.Debug("Fetching existing comments to check for duplicates")
 	comments, err := gh.getComments(ctx, repoOwner, repoName, pr)
 	if err != nil {
-		return fmt.Errorf("failed to list existing comments: %w", err)
+		errMsg := fmt.Sprintf("Failed to list existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	reviewComments := make([]*github.DraftReviewComment, 0)
 	nitpickComments := make([]string, 0)
 	nitpickCommentsByFile := make(map[string][]common.LineLevel)
 
+	logger.Debug("Getting existing review comments")
 	addedComments, err := gh.GetReviewRequestComments(repoOwner, repoName, pr)
 	if err != nil {
-		return fmt.Errorf("failed to get existing review comments: %w", err)
+		errMsg := fmt.Sprintf("Failed to get existing review comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
+	logger.Infof("Processing %d line feedback items", len(lineFeedback.GetLineFeedback()))
 	for _, ll := range lineFeedback.GetLineFeedback() {
 		skip := false
 
 		if ll.File == "" || ll.LineNumber <= 0 {
+			logger.Warnf("Skipping invalid line feedback - file: %s, line: %d", ll.File, ll.LineNumber)
 			continue
 		}
 
+		logger.Debugf("Getting blame for file: %s, line: %d", ll.File, ll.LineNumber)
 		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
 		if err != nil {
-			return fmt.Errorf("failed to get blame for line: %w", err)
+			errMsg := fmt.Sprintf("Failed to get blame for line: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		for _, existingComment := range addedComments {
 			if ll.File == existingComment.File &&
 				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
 				blame == existingComment.CommitHash {
-				fmt.Println("Skipping existing comment for file:", ll.File, "line:", ll.LineNumber)
+				logger.Infof("Skipping existing comment for file: %s, line: %d", ll.File, ll.LineNumber)
 				skip = true
 				break
 			}
@@ -198,7 +242,9 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 
 		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
 		if err != nil {
-			return fmt.Errorf("failed to check existing comments: %w", err)
+			errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		if commentID > 0 {
@@ -277,8 +323,11 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		)
 
 		if err != nil {
-			return fmt.Errorf("failed to post line feedback: %w", err)
+			errMsg := fmt.Sprintf("Failed to post line feedback: %v", err)
+			logger.Error(errMsg)
+			return errors.New(errMsg)
 		}
+		logger.Infof("Posted line feedback for PR %d in %s/%s", pr, repoOwner, repoName)
 	}
 
 	return nil
@@ -292,37 +341,39 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 
 	reviews, _, err := gh.client.PullRequests.ListReviews(ctx, repoOwner, repoName, pr, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list reviews: %w", err)
+		errMsg := fmt.Sprintf("Failed to list reviews: %v", err)
+		fmt.Println(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	for _, review := range reviews {
 		if review.ID == nil {
-			fmt.Println("Skipping review with nil ID")
+			logger.Warn("Skipping review with nil ID")
 			continue
 		}
 
 		comments, _, err := gh.client.PullRequests.ListReviewComments(ctx, repoOwner, repoName, pr, *review.ID, &github.ListOptions{})
 		if err != nil {
-			fmt.Println("Failed to list review comments:", err)
+			logger.Errorf("Failed to list review comments: %v", err)
 			continue
 		}
 
 		for _, comment := range comments {
 			// Skip replies to other comments
 			if comment.InReplyTo != nil {
-				fmt.Println("Skipping reply to another comment")
+				logger.Debugf("Skipping reply to another comment: %d", *comment.InReplyTo)
 				continue
 			}
 			if comment.PullRequestReviewID != nil && review.ID != nil && *comment.PullRequestReviewID == *review.ID {
 				lines := strings.Split(*comment.Body, "\n")
 				if len(lines) < 2 {
-					fmt.Println("Skipping comment with insufficient lines")
+					logger.Debugf("Skipping comment with insufficient lines: %d", len(lines))
 					continue
 				}
 
 				parts := strings.Split(lines[0], ":")
 				if len(parts) < 4 {
-					fmt.Println("Skipping comment with insufficient parts")
+					logger.Debugf("Skipping comment with insufficient parts: %d", len(parts))
 					continue
 				}
 
@@ -334,7 +385,7 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 					// Handle multi-line comments
 					lineParts := strings.Split(line, "-")
 					if len(lineParts) != 2 {
-						fmt.Println("Skipping comment with invalid line range")
+						logger.Debug("Skipping comment with invalid line range")
 						continue
 					}
 					firstLine, _ = strconv.Atoi(strings.TrimSpace(lineParts[0]))

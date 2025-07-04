@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 // AnthropicModel implements the LLM interface using Anthropic's API
@@ -22,7 +24,9 @@ type AnthropicModel struct {
 // NewAnthropic creates a new Anthropic client
 func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 	if apiKey == "" {
-		return nil, fmt.Errorf("API key cannot be empty")
+		errMsg := "anthropic API key cannot be empty"
+		logger.Error(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	// Create retryable HTTP client with exponential backoff using common configuration
@@ -67,16 +71,24 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 
 // Prompt sends a request to Anthropic and returns the response
 func (a *AnthropicModel) Prompt(req Request) Response {
+	logger.Debugf("Sending prompt to Anthropic model: %s", a.modelName)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(a.apiTimeout)*time.Second)
 	defer cancel()
 
 	userContent := []string{req.UserPrompt}
+	logger.Debug("Including message in Anthropic prompt")
+	logger.Debug(req.UserPrompt)
 
 	if req.Diff != "" {
+		logger.Debug("Including diff in Anthropic prompt")
+		logger.Debug(req.Diff)
 		userContent = append(userContent, req.Diff)
 	}
 
 	if req.FileContents != "" {
+		logger.Debug("Including file contents in Anthropic prompt")
+		logger.Debug(req.FileContents)
 		userContent = append(userContent, req.FileContents)
 	}
 
@@ -96,6 +108,11 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	default:
 		model = anthropic.ModelClaude3_7SonnetLatest // Default fallback
 	}
+
+	logger.Debug("Including system message in Anthropic prompt")
+	logger.Debug(req.SystemPrompt)
+
+	logger.Debugf("Using Anthropic model: %s with max tokens: %d", a.modelName, a.maxTokens)
 
 	// Create the message request
 	messageParams := anthropic.MessageNewParams{
@@ -117,8 +134,10 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	// Make the API call
 	message, err := a.client.Messages.New(ctx, messageParams)
 	if err != nil {
+		errMsg := fmt.Sprintf("Failed to create message with Anthropic: %v", err)
+		logger.Errorf(errMsg)
 		return Response{
-			Error: fmt.Errorf("failed to create message: %w", err),
+			Error: errors.New(errMsg),
 		}
 	}
 
@@ -130,6 +149,8 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 			content += b.Text
 		}
 	}
+
+	logger.Debugf("Received response from Anthropic: %s", content)
 
 	return Response{
 		Content: content,

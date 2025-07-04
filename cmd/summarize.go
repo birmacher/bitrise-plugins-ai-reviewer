@@ -10,6 +10,7 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/llm"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/prompt"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 	"github.com/spf13/cobra"
@@ -20,17 +21,22 @@ var summarizeCmd = &cobra.Command{
 	Short: "Summarize code changes using AI",
 	Long:  `Analyze code changes and provide summary using AI capabilities.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Running AI code review...")
+		logger.Info("Running AI code review...")
 
 		// Parse settings from command line flags
 		settings := parseSettings()
+		logger.Debugf("Using settings: %+v", settings)
 
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
+		logger.Info("Code review provider:", codeReviewerName)
+		logger.Info("Repository:", repo)
 
 		repoTags := strings.Split(repo, "/")
 		if len(repoTags) != 2 {
-			return errors.New("repository must be in the format 'owner/repo'")
+			errMsg := "repository must be in the format 'owner/repo'"
+			logger.Error(errMsg)
+			return errors.New(errMsg)
 		}
 		repoOwner := repoTags[0]
 		repoName := repoTags[1]
@@ -38,21 +44,28 @@ var summarizeCmd = &cobra.Command{
 		prStr, _ := cmd.Flags().GetString("pr")
 		pr, err := strconv.Atoi(prStr)
 		if err != nil {
-			return fmt.Errorf("invalid PR number: %v", err)
+			errMsg := fmt.Sprintf("Failed to parse PR number: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
+		logger.Infof("Pull Request: %d", pr)
 
 		var gitProvider review.Reviewer
 
 		if codeReviewerName != "" {
 			gitProvider, err = review.NewReviewer(codeReviewerName)
 			if err != nil {
-				return fmt.Errorf("failed to create Client for Review Provider: %v", err)
+				errMsg := fmt.Sprintf("Failed to create Client for Review Provider: %v", err)
+				logger.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 
 			emptySummary := common.Summary{}
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, emptySummary.Header(), emptySummary.InitiatedString())
 			if err != nil {
-				return fmt.Errorf("error posting review: %v", err)
+				errMsg := fmt.Sprintf("Error posting initial review: %v", err)
+				logger.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 		}
 
@@ -64,25 +77,33 @@ var summarizeCmd = &cobra.Command{
 
 		commitHash, err = git.GetCommitHash(commitHash)
 		if err != nil {
-			return fmt.Errorf("error getting commit hash: %v", err)
+			errMsg := fmt.Sprintf("Error getting commit hash: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		diff, err := git.GetDiff(commitHash, targetBranch)
 
 		if err != nil {
-			return fmt.Errorf("error getting diff with parent: %v", err)
+			errMsg := fmt.Sprintf("Error getting diff with parent: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		// Get the file contents
 		fileContent, err := git.GetFileContents(commitHash, targetBranch)
 		if err != nil {
-			return fmt.Errorf("error getting file contents: %v", err)
+			errMsg := fmt.Sprintf("Error getting file contents: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		// Get existing review comments
 		lineLevelFeedback, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
 		if err != nil {
-			return fmt.Errorf("error getting existing review comments: %v", err)
+			errMsg := fmt.Sprintf("Error getting existing review comments: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		// Setup LLM client
@@ -91,7 +112,9 @@ var summarizeCmd = &cobra.Command{
 
 		llmClient, err := llm.NewLLM(provider, model)
 		if err != nil {
-			return fmt.Errorf("failed to create Client for LLM Provider: %v", err)
+			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		// Setup the prompt
@@ -106,7 +129,9 @@ var summarizeCmd = &cobra.Command{
 		// Send the prompt and get the response
 		resp := llmClient.Prompt(req)
 		if resp.Error != nil {
-			return fmt.Errorf("error getting response: %v", resp.Error)
+			errMsg := fmt.Sprintf("Error getting response from LLM: %v", resp.Error)
+			logger.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 
 		fmt.Println("LLM Response:\n", resp.Content)
@@ -115,17 +140,23 @@ var summarizeCmd = &cobra.Command{
 		if codeReviewerName != "" {
 			summary := common.Summary{}
 			if err = json.Unmarshal([]byte(resp.Content), &summary); err != nil {
-				return fmt.Errorf("error parsing summary response: %v", err)
+				errMsg := fmt.Sprintf("Error parsing summary response: %v", err)
+				logger.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(settings))
 			if err != nil {
-				return fmt.Errorf("error posting review: %v", err)
+				errMsg := fmt.Sprintf("Error posting summary: %v", err)
+				logger.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 
 			lineLevel := common.LineLevelFeedback{}
 			if err = json.Unmarshal([]byte(resp.Content), &lineLevel); err != nil {
-				return fmt.Errorf("error parsing line-level response: %v", err)
+				errMsg := fmt.Sprintf("Error parsing line-level response: %v", err)
+				logger.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 
 			for idx, ll := range lineLevel.Lines {
@@ -137,19 +168,19 @@ var summarizeCmd = &cobra.Command{
 				isMultiline := ll.IsMultiline()
 
 				if !firstLineFound {
-					fmt.Printf("Error finding first line '%s' in file %s: %v\n", ll.FirstLine(), ll.File, err)
+					logger.Warnf("Error finding first line '%s' in file %s: %v", ll.FirstLine(), ll.File, err)
 				}
 
 				if isMultiline {
 					lastLineNumber, err = common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
 					lastLineFound = (err == nil && lastLineNumber > 0)
 					if !lastLineFound {
-						fmt.Printf("Error finding last line '%s' in file %s: %v\n", ll.LastLine(), ll.File, err)
+						logger.Warnf("Error finding last line '%s' in file %s: %v", ll.LastLine(), ll.File, err)
 					}
 				}
 
 				if !firstLineFound && !lastLineFound {
-					fmt.Printf("⚠️ Skipping review for file %s, no valid line numbers found in diff\n", ll.File)
+					logger.Warnf("Skipping review for file %s, no valid line numbers found in diff", ll.File)
 					continue
 				}
 
@@ -172,7 +203,9 @@ var summarizeCmd = &cobra.Command{
 
 			err = gitProvider.PostLineFeedback(git, repoOwner, repoName, pr, commitHash, lineLevel)
 			if err != nil {
-				return fmt.Errorf("error posting line feedback: %v", err)
+				errMsg := fmt.Sprintf("Error posting line feedback: %v", err)
+				logger.Errorf(errMsg)
+				return errors.New(errMsg)
 			}
 
 			fmt.Println("Review posted successfully!")

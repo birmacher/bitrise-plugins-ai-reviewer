@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 const (
@@ -30,6 +32,7 @@ type DefaultRunner struct {
 
 // NewDefaultRunner creates a new instance of DefaultRunner
 func NewDefaultRunner(repoPath string) *DefaultRunner {
+	logger.Debugf("Creating new Git runner with repo path: %s", repoPath)
 	return &DefaultRunner{
 		RepoPath: repoPath,
 	}
@@ -37,6 +40,7 @@ func NewDefaultRunner(repoPath string) *DefaultRunner {
 
 // Run executes a git command and returns its output
 func (r *DefaultRunner) Run(name string, args ...string) (string, error) {
+	logger.Debugf("Running git command: %s %s", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...)
 	if r.RepoPath != "" {
 		cmd.Dir = r.RepoPath
@@ -48,10 +52,13 @@ func (r *DefaultRunner) Run(name string, args ...string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("error running command: %s\nstderr: %s", err, stderr.String())
+		errMsg := fmt.Sprintf("error running command: %s\nstderr: %s", err, stderr.String())
+		logger.Errorf("Git command failed: %s", errMsg)
+		return "", errors.New(errMsg)
 	}
 
-	return strings.TrimSpace(stdout.String()), nil
+	result := strings.TrimSpace(stdout.String())
+	return result, nil
 }
 
 // Client provides Git operations for AI code review
@@ -61,18 +68,19 @@ type Client struct {
 
 // NewClient creates a new Git client
 func NewClient(runner Runner) *Client {
+	logger.Debug("Creating new Git client")
 	return &Client{
 		runner: runner,
 	}
 }
 
 func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
-	fmt.Println("")
-	fmt.Println("Generating diff...")
 
 	commitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
-		return "", fmt.Errorf("error getting commit hash: %w", err)
+		errMsg := fmt.Sprintf("error getting commit hash: %v", err)
+		logger.Errorf(errMsg)
+		return "", errors.New(errMsg)
 	}
 	fmt.Println("Using commit hash:", commitHash)
 
