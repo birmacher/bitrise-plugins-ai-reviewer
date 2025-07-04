@@ -23,3 +23,12 @@ func WrapString(s string, width int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func GetIndentation(line string) string {
+	for i, c := range line {
+		if c != ' ' && c != '\t' {
+			return line[:i]
+		}
+	}
+	return ""
+}
