@@ -129,8 +129,6 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			for idx, ll := range lineLevel.Lines {
-				var err error
-
 				firstLineFound := true
 				lastLineFound := true
 
