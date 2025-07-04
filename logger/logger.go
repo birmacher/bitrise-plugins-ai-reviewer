@@ -23,8 +23,12 @@ func Init(level string) {
 	once.Do(func() {
 		// Parse log level
 		var zapLevel zapcore.Level
-		if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
-			zapLevel = zap.InfoLevel // Default to info level
+
+		lvl, err := zapcore.ParseLevel(level)
+		if err == nil {
+			zapLevel = lvl
+		} else {
+			zapLevel = zapcore.InfoLevel
 		}
 
 		// Create encoder config
@@ -54,6 +58,47 @@ func Init(level string) {
 		logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
 		sugar = logger.Sugar()
 	})
+}
+
+// SetLevel changes the log level of the logger
+func SetLevel(level string) {
+	// Parse log level
+	var zapLevel zapcore.Level
+
+	lvl, err := zapcore.ParseLevel(level)
+	if err == nil {
+		zapLevel = lvl
+	} else {
+		zapLevel = zapcore.InfoLevel
+	}
+	Info("Changing log level to:", level)
+
+	// Create new encoder config (same as in Init)
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "ts",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	}
+
+	// Create new core with updated level
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.AddSync(os.Stdout),
+		zapLevel,
+	)
+
+	// Replace the logger
+	logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
+	sugar = logger.Sugar()
 }
 
 // Sugar returns the global sugared logger
