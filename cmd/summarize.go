@@ -134,7 +134,8 @@ var summarizeCmd = &cobra.Command{
 			return errors.New(errMsg)
 		}
 
-		fmt.Println("LLM Response:\n", resp.Content)
+		logger.Debug("LLM Response:")
+		logger.Debug(resp.Content)
 
 		// Send to the review provider
 		if codeReviewerName != "" {
@@ -208,7 +209,7 @@ var summarizeCmd = &cobra.Command{
 				return errors.New(errMsg)
 			}
 
-			fmt.Println("Review posted successfully!")
+			logger.Info("Review posted successfully!")
 		}
 
 		return nil

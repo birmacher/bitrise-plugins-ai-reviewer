@@ -45,7 +45,7 @@ func Init(level string) {
 
 		// Create core
 		core := zapcore.NewCore(
-			zapcore.NewJSONEncoder(encoderConfig),
+			zapcore.NewConsoleEncoder(encoderConfig),
 			zapcore.AddSync(os.Stdout),
 			zapLevel,
 		)
