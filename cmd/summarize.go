@@ -23,7 +23,7 @@ var summarizeCmd = &cobra.Command{
 		fmt.Println("Running AI code review...")
 
 		// Parse settings from command line flags
-		settings := parseSettings(cmd)
+		settings := parseSettings()
 
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
@@ -130,24 +130,43 @@ var summarizeCmd = &cobra.Command{
 
 			for idx, ll := range lineLevel.Lines {
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
-				if err != nil {
-					fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
+				var lastLineNumber int
+
+				firstLineFound := (err == nil && lineNumber > 0)
+				lastLineFound := false
+				isMultiline := ll.IsMultiline()
+
+				if !firstLineFound {
+					fmt.Printf("Error finding first line '%s' in file %s: %v\n", ll.FirstLine(), ll.File, err)
+				}
+
+				if isMultiline {
+					lastLineNumber, err = common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
+					lastLineFound = (err == nil && lastLineNumber > 0)
+					if !lastLineFound {
+						fmt.Printf("Error finding last line '%s' in file %s: %v\n", ll.LastLine(), ll.File, err)
+					}
+				}
+
+				if !firstLineFound && !lastLineFound {
+					fmt.Printf("⚠️ Skipping review for file %s, no valid line numbers found in diff\n", ll.File)
 					continue
 				}
-				lineLevel.Lines[idx].LineNumber = lineNumber
-				lineLevel.Lines[idx].LastLineNumber = lineNumber
 
-				if ll.IsMultiline() {
-					lastLineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
-					if err != nil {
-						fmt.Printf("Error getting line number for file %s: %v\n", ll.File, err)
-						continue
+				if firstLineFound {
+					lineLevel.Lines[idx].LineNumber = lineNumber
+					if isMultiline && lastLineFound {
+						if lastLineNumber > lineLevel.Lines[idx].LineNumber {
+							lineLevel.Lines[idx].LastLineNumber = lastLineNumber
+						}
 					}
+				}
 
-					if lastLineNumber > lineLevel.Lines[idx].LineNumber {
-						lineLevel.Lines[idx].LastLineNumber = lastLineNumber
-					}
-
+				if !firstLineFound && isMultiline && lastLineFound {
+					lineLevel.Lines[idx].LineNumber = lastLineNumber
+					// Clear suggestion as we have moved the starting line number
+					// and it won't be correct anymore
+					lineLevel.Lines[idx].Suggestion = ""
 				}
 			}
 
@@ -177,24 +196,8 @@ func init() {
 	summarizeCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
 	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
 	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
-	// Settings
-	summarizeCmd.Flags().StringP("language", "", "en-US", "Language for the review output (e.g., en-US, es-ES)")
-	summarizeCmd.Flags().StringP("tone", "", "", "Tone for the review output (e.g., Talk as Mr.T)")
-	summarizeCmd.Flags().StringP("profile", "", "chill", "Profile for the review tone ( e.g., chill, assertive )")
 }
 
-func parseSettings(cmd *cobra.Command) common.Settings {
-	settings := common.WithYamlFile()
-
-	if language, _ := cmd.Flags().GetString("language"); language != "" {
-		settings.Language = language
-	}
-	if tone, _ := cmd.Flags().GetString("tone"); tone != "" {
-		settings.Tone = tone
-	}
-	if profile, _ := cmd.Flags().GetString("profile"); profile != "" {
-		settings.Reviews.Profile = profile
-	}
-
-	return settings
+func parseSettings() common.Settings {
+	return common.WithYamlFile()
 }

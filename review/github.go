@@ -173,9 +173,19 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	for _, ll := range lineFeedback.GetLineFeedback() {
 		skip := false
 
+		if ll.File == "" || ll.LineNumber <= 0 {
+			continue
+		}
+
+		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
+		if err != nil {
+			return fmt.Errorf("failed to get blame for line: %w", err)
+		}
+
 		for _, existingComment := range addedComments {
 			if ll.File == existingComment.File &&
-				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber {
+				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
+				blame == existingComment.CommitHash {
 				fmt.Println("Skipping existing comment for file:", ll.File, "line:", ll.LineNumber)
 				skip = true
 				break
@@ -187,16 +197,11 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		}
 
 		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
-
 		if err != nil {
 			return fmt.Errorf("failed to check existing comments: %w", err)
 		}
 
 		if commentID > 0 {
-			continue
-		}
-
-		if ll.File == "" || ll.LineNumber <= 0 {
 			continue
 		}
 
@@ -213,8 +218,6 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		}
 
 		reviewComments = append(reviewComments, reviewComment)
-
-		// Todo: handle lines that is outside of the diff hunks
 	}
 
 	// Nitpick comment

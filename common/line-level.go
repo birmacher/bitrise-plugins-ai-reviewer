@@ -84,7 +84,15 @@ func (l LineLevel) StringForAssistant() string {
 
 // IsMultiline checks if the line content spans multiple lines
 func (l LineLevel) IsMultiline() bool {
-	return l.Line != "" && strings.Contains(l.Line, "\n")
+	if l.Line == "" {
+		return false
+	}
+
+	// Normalize line endings to \n and strip trailing newlines
+	normalizedLine := strings.ReplaceAll(strings.ReplaceAll(l.Line, "\r\n", "\n"), "\r", "\n")
+	trimmedLine := strings.TrimRight(normalizedLine, "\n")
+
+	return strings.Contains(trimmedLine, "\n")
 }
 
 // FirstLine returns the first line of the content
