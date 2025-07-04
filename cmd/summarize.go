@@ -201,10 +201,9 @@ var summarizeCmd = &cobra.Command{
 					lineLevel.Lines[idx].Suggestion = ""
 				}
 
-				// Fix identation for suggestions
+				// Fix indentation for suggestions
 				if lineLevel.Lines[idx].Suggestion != "" {
 					indentation := strings.TrimRight(ll.FirstLine(), strings.TrimLeft(ll.FirstLine(), " \t"))
-					fmt.Println("Indentation for suggestion:", indentation)
 
 					suggestionLines := strings.Split(lineLevel.Lines[idx].Suggestion, "\n")
 					firstSuggestionIndentation := strings.TrimRight(suggestionLines[0], strings.TrimLeft(suggestionLines[0], " \t"))
