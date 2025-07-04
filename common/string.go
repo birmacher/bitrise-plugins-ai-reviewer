@@ -37,6 +37,9 @@ func GetIndentation(line string) string {
 }
 
 func DetectLogicalIndent(text string) (string, int) {
+	if text == "" {
+		return "", 0
+	}
 	var prevIndentLen int
 	var diffs []int
 	var indentChar string
