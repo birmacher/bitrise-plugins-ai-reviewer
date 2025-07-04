@@ -23,7 +23,7 @@ var summarizeCmd = &cobra.Command{
 		fmt.Println("Running AI code review...")
 
 		// Parse settings from command line flags
-		settings := parseSettings(cmd)
+		settings := parseSettings()
 
 		codeReviewerName, _ := cmd.Flags().GetString("code-review")
 		repo, _ := cmd.Flags().GetString("repo")
@@ -195,24 +195,10 @@ func init() {
 	summarizeCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
 	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
 	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
-	// Settings
-	summarizeCmd.Flags().StringP("language", "", "en-US", "Language for the review output (e.g., en-US, es-ES)")
-	summarizeCmd.Flags().StringP("tone", "", "", "Tone for the review output (e.g., Talk as Mr.T)")
-	summarizeCmd.Flags().StringP("profile", "", "chill", "Profile for the review tone ( e.g., chill, assertive )")
 }
 
-func parseSettings(cmd *cobra.Command) common.Settings {
+func parseSettings() common.Settings {
 	settings := common.WithYamlFile()
-
-	if language, _ := cmd.Flags().GetString("language"); language != "" {
-		settings.Language = language
-	}
-	if tone, _ := cmd.Flags().GetString("tone"); tone != "" {
-		settings.Tone = tone
-	}
-	if profile, _ := cmd.Flags().GetString("profile"); profile != "" {
-		settings.Reviews.Profile = profile
-	}
 
 	return settings
 }
