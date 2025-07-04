@@ -130,7 +130,7 @@ var summarizeCmd = &cobra.Command{
 
 			for idx, ll := range lineLevel.Lines {
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
-				lastLineNumber := 0
+				var lastLineNumber int
 
 				firstLineFound := (err == nil && lineNumber > 0)
 				lastLineFound := false
@@ -164,6 +164,9 @@ var summarizeCmd = &cobra.Command{
 
 				if !firstLineFound && isMultiline && lastLineFound {
 					lineLevel.Lines[idx].LineNumber = lastLineNumber
+					// Clear suggestion as we have moved the starting line number
+					// and it won't be correct anymore
+					lineLevel.Lines[idx].Suggestion = ""
 				}
 			}
 
