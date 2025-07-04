@@ -129,21 +129,20 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			for idx, ll := range lineLevel.Lines {
-				firstLineFound := true
-				lastLineFound := true
-
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
 				lastLineNumber := 0
 
-				if err != nil || lineNumber <= 0 {
-					firstLineFound = false
+				firstLineFound := (err != nil && lineNumber > 0)
+				lastLineFound := false
+
+				if !firstLineFound {
 					fmt.Printf("Error finding first line '%s' in file %s: %v\n", ll.FirstLine(), ll.File, err)
 				}
 
 				if ll.IsMultiline() {
 					lastLineNumber, err = common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
-					if err != nil || lastLineNumber <= 0 {
-						lastLineFound = false
+					lastLineFound = (err != nil && lastLineNumber > 0)
+					if !lastLineFound {
 						fmt.Printf("Error finding last line '%s' in file %s: %v\n", ll.LastLine(), ll.File, err)
 					}
 				}
