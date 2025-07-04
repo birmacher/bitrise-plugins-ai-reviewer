@@ -99,8 +99,6 @@ func GetIndentationForLine(line string) string {
 	}
 	return line
 }
-	return strings.TrimLeft(line, " \t")
-}
 
 func ReplaceTabIndentation(input, indentation, prefix string) string {
 	if input == "" || indentation == "" {
