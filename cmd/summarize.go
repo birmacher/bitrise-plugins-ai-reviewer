@@ -134,12 +134,13 @@ var summarizeCmd = &cobra.Command{
 
 				firstLineFound := (err == nil && lineNumber > 0)
 				lastLineFound := false
+				isMultiline := ll.IsMultiline()
 
 				if !firstLineFound {
 					fmt.Printf("Error finding first line '%s' in file %s: %v\n", ll.FirstLine(), ll.File, err)
 				}
 
-				if ll.IsMultiline() {
+				if isMultiline {
 					lastLineNumber, err = common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.LastLine())
 					lastLineFound = (err == nil && lastLineNumber > 0)
 					if !lastLineFound {
@@ -154,14 +155,14 @@ var summarizeCmd = &cobra.Command{
 
 				if firstLineFound {
 					lineLevel.Lines[idx].LineNumber = lineNumber
-					if ll.IsMultiline() && lastLineFound {
+					if isMultiline && lastLineFound {
 						if lastLineNumber > lineLevel.Lines[idx].LineNumber {
 							lineLevel.Lines[idx].LastLineNumber = lastLineNumber
 						}
 					}
 				}
 
-				if !firstLineFound && ll.IsMultiline() && lastLineFound {
+				if !firstLineFound && isMultiline && lastLineFound {
 					lineLevel.Lines[idx].LineNumber = lastLineNumber
 				}
 			}
