@@ -195,7 +195,5 @@ func init() {
 }
 
 func parseSettings() common.Settings {
-	settings := common.WithYamlFile()
-
-	return settings
+	return common.WithYamlFile()
 }
