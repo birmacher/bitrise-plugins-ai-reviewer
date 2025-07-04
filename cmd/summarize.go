@@ -200,6 +200,20 @@ var summarizeCmd = &cobra.Command{
 					// and it won't be correct anymore
 					lineLevel.Lines[idx].Suggestion = ""
 				}
+
+				// Fix identation for suggestions
+				if lineLevel.Lines[idx].Suggestion != "" {
+					indentation := strings.TrimRight(ll.FirstLine(), strings.TrimLeft(ll.FirstLine(), " \t"))
+					fmt.Println("Indentation for suggestion:", indentation)
+
+					suggestionLines := strings.Split(lineLevel.Lines[idx].Suggestion, "\n")
+					firstSuggestionIndentation := strings.TrimRight(suggestionLines[0], strings.TrimLeft(suggestionLines[0], " \t"))
+					for i, line := range suggestionLines {
+						suggestionLines[i] = indentation + line[len(firstSuggestionIndentation):]
+					}
+					lineLevel.Lines[idx].Suggestion = strings.Join(suggestionLines, "\n")
+
+				}
 			}
 
 			err = gitProvider.PostLineFeedback(git, repoOwner, repoName, pr, commitHash, lineLevel)
