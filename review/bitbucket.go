@@ -100,6 +100,11 @@ func NewBitbucket(opts ...Option) (Reviewer, error) {
 	return bb, nil
 }
 
+// GetProvider returns the name of the review provider
+func (bb *Bitbucket) GetProvider() string {
+	return ProviderBitbucket
+}
+
 func (bb *Bitbucket) SupportCollapsibleMarkdown() bool {
 	return false
 }

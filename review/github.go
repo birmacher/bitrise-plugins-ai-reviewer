@@ -100,6 +100,11 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	return gh, nil
 }
 
+// GetProvider returns the name of the review provider
+func (gh *GitHub) GetProvider() string {
+	return ProviderGitHub
+}
+
 func (gh *GitHub) SupportCollapsibleMarkdown() bool {
 	return true
 }
