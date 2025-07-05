@@ -50,11 +50,11 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 		}
 	}
 
-	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: %s:%s:%s -->", l.File, lineNumber, gitBlame)
+	return fmt.Sprintf("[bitrise-plugin-ai-reviewer]: %s:%s:%s", l.File, lineNumber, gitBlame)
 }
 
 // String formats the complete comment with header, body and suggestion
-func (l LineLevel) String(client *git.Client, commitHash string) string {
+func (l LineLevel) String(provider string, client *git.Client, commitHash string) string {
 	if l.File == "" || l.LineNumber <= 0 || l.Body == "" {
 		return ""
 	}
@@ -67,11 +67,29 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 		body = append(body, fmt.Sprintf("**%s**", l.Title))
 	}
 	body = append(body, l.Body)
-	if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
-		body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n\n```\n%s\n```\n\n</details>", l.getAIPrompt()))
+
+	if provider == "bitbucket" {
+		if len(l.Prompt) > 0 {
+			body = append(body, fmt.Sprintf("**🤖 Prompt for AI Agents:**\n\n```\n%s\n```\n\n", l.getAIPrompt()))
+		}
+	} else {
+		if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
+			body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n\n```\n%s\n```\n\n</details>", l.getAIPrompt()))
+		}
 	}
+
 	if len(l.Suggestion) > 0 {
-		body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
+		var suggestionStr string
+		switch provider {
+		case "bitbucket":
+			for line := range strings.SplitSeq(l.Suggestion, "\n") {
+				suggestionStr += fmt.Sprintf("+%s\n", line)
+			}
+			suggestionStr = "```diff\n" + suggestionStr + "```"
+		case "github":
+			suggestionStr = "```suggestion\n" + l.Suggestion + "\n```"
+		}
+		body = append(body, fmt.Sprintf("**🔄 Suggestion:**\n%s", suggestionStr))
 	}
 	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), strings.Join(body, "\n\n"))
 }

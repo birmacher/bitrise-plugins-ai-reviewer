@@ -100,6 +100,15 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	return gh, nil
 }
 
+// GetProvider returns the name of the review provider
+func (gh *GitHub) GetProvider() string {
+	return ProviderGitHub
+}
+
+func (gh *GitHub) SupportCollapsibleMarkdown() bool {
+	return true
+}
+
 func (gh *GitHub) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]*github.IssueComment, error) {
 	comments, _, err := gh.client.Issues.ListComments(
 		ctx,
@@ -253,7 +262,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
-		reviewBody := ll.String(client, commitHash)
+		reviewBody := ll.String(gh.GetProvider(), client, commitHash)
 		reviewComment := &github.DraftReviewComment{
 			Path: &ll.File,
 			Line: &ll.LineNumber,

@@ -146,7 +146,7 @@ var summarizeCmd = &cobra.Command{
 				return errors.New(errMsg)
 			}
 
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(settings))
+			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(gitProvider.GetProvider(), settings))
 			if err != nil {
 				errMsg := fmt.Sprintf("Error posting summary: %v", err)
 				logger.Errorf(errMsg)
