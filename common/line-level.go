@@ -79,16 +79,17 @@ func (l LineLevel) String(provider string, client *git.Client, commitHash string
 	}
 
 	if len(l.Suggestion) > 0 {
+		var suggestionStr string
 		switch provider {
 		case "bitbucket":
-			var suggestionDiff string
-			for _, line := range strings.Split(l.Suggestion, "\n") {
-				suggestionDiff += fmt.Sprintf("+%s\n", line)
+			for line := range strings.SplitSeq(l.Suggestion, "\n") {
+				suggestionStr += fmt.Sprintf("+%s\n", line)
 			}
-			body = append(body, fmt.Sprintf("**Suggestion:**\n```diff\n%s\n```", suggestionDiff))
+			suggestionStr = "```diff\n" + suggestionStr + "```"
 		case "github":
-			body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
+			suggestionStr = "```suggestion\n" + l.Suggestion + "\n```"
 		}
+		body = append(body, fmt.Sprintf("**🔄 Suggestion:**\n%s", suggestionStr))
 	}
 	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), strings.Join(body, "\n\n"))
 }
