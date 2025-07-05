@@ -100,6 +100,10 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 	return gh, nil
 }
 
+func (gh *GitHub) SupportCollapsibleMarkdown() bool {
+	return true
+}
+
 func (gh *GitHub) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]*github.IssueComment, error) {
 	comments, _, err := gh.client.Issues.ListComments(
 		ctx,

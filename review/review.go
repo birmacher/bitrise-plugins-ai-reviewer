@@ -11,9 +11,8 @@ import (
 )
 
 const (
-	// ProviderGitHub represents the GitHub provider
-	ProviderGitHub = "github"
-	// Add more providers as needed, such as GitLab, Bitbucket, etc.
+	ProviderGitHub    = "github"
+	ProviderBitbucket = "bitbucket"
 )
 
 // OptionType defines the type of option for review providers
@@ -58,20 +57,37 @@ func WithBaseURL(baseURL string) Option {
 
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
+	SupportCollapsibleMarkdown() bool
 	PostSummary(repoOwner, repoName string, pr int, header, body string) error
 	PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error
 	GetReviewRequestComments(repoOwner, repoName string, pr int) ([]common.LineLevel, error)
 }
 
-// getAPIToken retrieves the API token from environment variables
-func getAPIToken() (string, error) {
-	apiToken := os.Getenv("GITHUB_TOKEN")
-	if apiToken == "" {
-		errMsg := "GITHUB_TOKEN environment variable is not set"
+// getAPIToken retrieves the API token from environment variables based on provider
+func getAPIToken(provider string) (string, error) {
+	var apiToken string
+	var envVarName string
+
+	switch provider {
+	case ProviderGitHub:
+		envVarName = "GITHUB_TOKEN"
+		apiToken = os.Getenv(envVarName)
+	case ProviderBitbucket:
+		envVarName = "BITBUCKET_TOKEN"
+		apiToken = os.Getenv(envVarName)
+	default:
+		errMsg := fmt.Sprintf("Unsupported provider: %s", provider)
 		logger.Error(errMsg)
 		return "", errors.New(errMsg)
 	}
-	logger.Debug("Successfully retrieved GitHub API token")
+
+	if apiToken == "" {
+		errMsg := fmt.Sprintf("%s environment variable is not set", envVarName)
+		logger.Error(errMsg)
+		return "", errors.New(errMsg)
+	}
+
+	logger.Debugf("Successfully retrieved %s API token", provider)
 	return apiToken, nil
 }
 
@@ -82,7 +98,7 @@ func NewReviewer(providerName string, opts ...Option) (Reviewer, error) {
 	var reviewer Reviewer
 	var err error
 
-	apiToken, err := getAPIToken()
+	apiToken, err := getAPIToken(providerName)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to get API token: %v", err)
 		logger.Errorf(errMsg)
@@ -106,6 +122,9 @@ func NewReviewer(providerName string, opts ...Option) (Reviewer, error) {
 	case ProviderGitHub:
 		logger.Debug("Initializing GitHub reviewer")
 		reviewer, err = NewGitHub(options...)
+	case ProviderBitbucket:
+		logger.Debug("Initializing Bitbucket reviewer")
+		reviewer, err = NewBitbucket(options...)
 	default:
 		errMsg := fmt.Sprintf("unsupported review provider: %s", providerName)
 		logger.Error(errMsg)

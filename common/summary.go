@@ -20,15 +20,15 @@ type Summary struct {
 
 // Header returns the HTML comment that identifies this as a summary from the plugin
 func (s Summary) Header() string {
-	return "<!-- bitrise-plugin-ai-reviewer: summary -->"
+	return "[bitrise-plugin-ai-reviewer]: summary"
 }
 
 // String formats the complete summary as a markdown string
-func (s Summary) String(settings Settings) string {
+func (s Summary) String(settings Settings, collapsible bool) string {
 	var builder strings.Builder
 	builder.WriteString(s.Header() + "\n\n")
 
-	if settings.Reviews.CollapseWalkthrough {
+	if collapsible && settings.Reviews.CollapseWalkthrough {
 		builder.WriteString("<details>\n")
 		builder.WriteString("<summary>📝 Summary of changes</summary>\n\n")
 	}
@@ -44,7 +44,7 @@ func (s Summary) String(settings Settings) string {
 		builder.WriteString(formatWalkthrough(s.Walkthrough) + "\n")
 	}
 
-	if settings.Reviews.CollapseWalkthrough {
+	if collapsible && settings.Reviews.CollapseWalkthrough {
 		builder.WriteString("</details>\n\n")
 	}
 

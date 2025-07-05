@@ -50,7 +50,7 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 		}
 	}
 
-	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: %s:%s:%s -->", l.File, lineNumber, gitBlame)
+	return fmt.Sprintf("[bitrise-plugin-ai-reviewer]: %s:%s:%s", l.File, lineNumber, gitBlame)
 }
 
 // String formats the complete comment with header, body and suggestion
