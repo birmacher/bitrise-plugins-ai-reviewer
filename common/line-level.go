@@ -54,7 +54,7 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 }
 
 // String formats the complete comment with header, body and suggestion
-func (l LineLevel) String(client *git.Client, commitHash string) string {
+func (l LineLevel) String(provider string, client *git.Client, commitHash string) string {
 	if l.File == "" || l.LineNumber <= 0 || l.Body == "" {
 		return ""
 	}
@@ -67,11 +67,28 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 		body = append(body, fmt.Sprintf("**%s**", l.Title))
 	}
 	body = append(body, l.Body)
-	if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
-		body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n\n```\n%s\n```\n\n</details>", l.getAIPrompt()))
+
+	if provider == "bitbucket" {
+		if len(l.Prompt) > 0 {
+			body = append(body, fmt.Sprintf("**🤖 Prompt for AI Agents:**\n\n```\n%s\n```\n\n", l.getAIPrompt()))
+		}
+	} else {
+		if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
+			body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n\n```\n%s\n```\n\n</details>", l.getAIPrompt()))
+		}
 	}
+
 	if len(l.Suggestion) > 0 {
-		body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
+		switch provider {
+		case "bitbucket":
+			var suggestionDiff string
+			for _, line := range strings.Split(l.Suggestion, "\n") {
+				suggestionDiff += fmt.Sprintf("+%s\n", line)
+			}
+			body = append(body, fmt.Sprintf("**Suggestion:**\n```diff\n%s\n```", suggestionDiff))
+		case "github":
+			body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
+		}
 	}
 	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), strings.Join(body, "\n\n"))
 }

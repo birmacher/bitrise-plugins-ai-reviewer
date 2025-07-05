@@ -321,7 +321,7 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 		}
 
 		// Prepare the inline comment
-		reviewBody := ll.String(client, commitHash)
+		reviewBody := ll.String(bb.GetProvider(), client, commitHash)
 		comment := PRComment{
 			Content: struct {
 				Raw string `json:"raw"`
