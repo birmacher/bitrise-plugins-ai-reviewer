@@ -19,10 +19,8 @@ import (
 
 // Bitbucket implements the Reviewer interface for Bitbucket PRs
 type Bitbucket struct {
-	client   *http.Client
-	apiToken string
-	timeout  int
-	baseURL  string
+	*BaseReviewer
+	client *http.Client
 }
 
 // PRComment represents a comment on a pull request
@@ -50,43 +48,21 @@ type CommentResponse struct {
 func NewBitbucket(opts ...Option) (Reviewer, error) {
 	logger.Debug("Creating new Bitbucket reviewer client")
 
+	baseReviewer, err := NewBaseReviewer(ProviderBitbucket, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	baseReviewer.BaseURL = "https://api.bitbucket.org/2.0"
+
 	bb := &Bitbucket{
-		timeout: 60, // Default timeout
-		baseURL: "https://api.bitbucket.org/2.0",
-	}
-
-	// Apply options
-	for _, opt := range opts {
-		switch opt.Type {
-		case APITokenOption:
-			if token, ok := opt.Value.(string); ok {
-				bb.apiToken = token
-				logger.Debug("Bitbucket API token configured")
-			}
-		case TimeoutOption:
-			if timeout, ok := opt.Value.(int); ok {
-				bb.timeout = timeout
-				logger.Debugf("Bitbucket API timeout set to %d seconds", timeout)
-			}
-		case BaseURLOption:
-			if baseURL, ok := opt.Value.(string); ok {
-				bb.baseURL = baseURL
-				logger.Debugf("Bitbucket base URL configured: %s", baseURL)
-			}
-		}
-	}
-
-	// Validate required options
-	if bb.apiToken == "" {
-		errMsg := "Bitbucket API token is required"
-		logger.Error(errMsg)
-		return nil, errors.New(errMsg)
+		BaseReviewer: baseReviewer,
 	}
 
 	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
 	standardClient := retryClient.StandardClient()
 
-	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: bb.apiToken})
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: bb.ApiToken})
 	tc := oauth2.NewClient(context.Background(), ts)
 
 	tc.Transport = &oauth2.Transport{
@@ -112,7 +88,7 @@ func (bb *Bitbucket) SupportCollapsibleMarkdown() bool {
 // getComments retrieves all comments for a pull request
 func (bb *Bitbucket) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]CommentResponse, error) {
 	commentsURL := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments",
-		bb.baseURL, repoOwner, repoName, pr)
+		bb.BaseURL, repoOwner, repoName, pr)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", commentsURL, nil)
 	if err != nil {
@@ -155,7 +131,7 @@ func (bb *Bitbucket) getComment(comments []CommentResponse, header string) (int,
 func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, body string) error {
 	logger.Infof("Posting summary to PR #%d in %s/%s", pr, repoOwner, repoName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(bb.timeout)*time.Second)
+	ctx, cancel := bb.CreateTimeoutContext()
 	defer cancel()
 
 	logger.Debug("Fetching existing comments to check for duplicates")
@@ -200,13 +176,13 @@ func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, bod
 	if commentID > 0 {
 		// Update existing comment
 		apiURL = fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments/%d",
-			bb.baseURL, repoOwner, repoName, pr, commentID)
+			bb.BaseURL, repoOwner, repoName, pr, commentID)
 		req, err = http.NewRequestWithContext(ctx, "PUT", apiURL, strings.NewReader(string(jsonData)))
 		logger.Debugf("Updating existing comment with ID: %d", commentID)
 	} else {
 		// Create new comment
 		apiURL = fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments",
-			bb.baseURL, repoOwner, repoName, pr)
+			bb.BaseURL, repoOwner, repoName, pr)
 		req, err = http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(jsonData)))
 		logger.Debug("Creating new comment")
 	}
@@ -248,7 +224,7 @@ func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, bod
 func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error {
 	logger.Infof("Posting line feedback to PR #%d in %s/%s, commit: %s", pr, repoOwner, repoName, commitHash)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(bb.timeout)*time.Second)
+	ctx, cancel := bb.CreateTimeoutContext()
 	defer cancel()
 
 	// Get existing comments to avoid duplicates
@@ -348,36 +324,16 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 	}
 
 	// Process nitpick comments
-	for _, ll := range lineFeedback.GetNitpickFeedback() {
-		if ll.File == "" || ll.LineNumber <= 0 {
-			continue
-		}
-
-		if nitpickCommentsByFile[ll.File] == nil {
-			nitpickCommentsByFile[ll.File] = []common.LineLevel{}
-		}
-		nitpickCommentsByFile[ll.File] = append(nitpickCommentsByFile[ll.File], ll)
+	var processErr error
+	nitpickCommentsByFile, processErr = ProcessLineFeedbackItems(bb.GetProvider(), client, commitHash, existingComments, lineFeedback)
+	if processErr != nil {
+		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", processErr)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
-	// Build nitpick comments by file
-	nitpickContent := strings.Builder{}
-	for filepath, comments := range nitpickCommentsByFile {
-		nitpickContent.WriteString("<details>\n")
-		nitpickContent.WriteString("<summary>" + filepath + " (" + strconv.Itoa(len(comments)) + ")</summary>\n\n")
-
-		for _, c := range comments {
-			line := fmt.Sprintf("%d", c.LineNumber)
-			if c.IsMultiline() {
-				line = line + "-" + fmt.Sprintf("%d", c.LastLineNumber)
-			}
-			nitpickContent.WriteString("<!-- bitrise-plugin-ai-reviewer: " + filepath + ":" + line + " -->\n")
-			nitpickContent.WriteString("`" + line + "`: **" + c.Title + "**\n\n")
-			nitpickContent.WriteString(c.Body + "\n\n")
-		}
-
-		nitpickContent.WriteString("</details>\n\n")
-		nitpickComments = append(nitpickComments, nitpickContent.String())
-	}
+	// Format nitpick comments for display
+	nitpickComments = FormatNitpickComments(bb.GetProvider(), nitpickCommentsByFile)
 
 	// Post all line comments
 	if len(lineComments) > 0 {
@@ -389,7 +345,7 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 			}
 
 			apiURL := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments",
-				bb.baseURL, repoOwner, repoName, pr)
+				bb.BaseURL, repoOwner, repoName, pr)
 
 			req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(jsonData)))
 			if err != nil {
@@ -415,19 +371,13 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 
 	// Post nitpick comments as a summary comment if they exist
 	if len(nitpickComments) > 0 {
-		overallReview := strings.Builder{}
-		overallReview.WriteString("_This is an AI-generated review. Please review it carefully._\n\n")
-		overallReview.WriteString(fmt.Sprintf("**Actionable comments posted: %d**\n\n", len(lineComments)))
-		overallReview.WriteString("<details>\n")
-		overallReview.WriteString("<summary>🧹 Nitpick comments</summary>\n")
-		overallReview.WriteString(strings.Join(nitpickComments, "\n\n---\n\n"))
-		overallReview.WriteString("</details>\n\n")
+		overallReviewStr := FormatOverallReview(len(lineComments), nitpickComments)
 
 		nitpickPRComment := PRComment{
 			Content: struct {
 				Raw string `json:"raw"`
 			}{
-				Raw: overallReview.String(),
+				Raw: overallReviewStr,
 			},
 		}
 
@@ -439,7 +389,7 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 		}
 
 		apiURL := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments",
-			bb.baseURL, repoOwner, repoName, pr)
+			bb.BaseURL, repoOwner, repoName, pr)
 
 		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(jsonData)))
 		if err != nil {
@@ -471,13 +421,13 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 
 // GetReviewRequestComments retrieves existing review comments for a PR
 func (bb *Bitbucket) GetReviewRequestComments(repoOwner, repoName string, pr int) ([]common.LineLevel, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(bb.timeout)*time.Second)
+	ctx, cancel := bb.CreateTimeoutContext()
 	defer cancel()
 
 	lineReviews := []common.LineLevel{}
 
 	apiURL := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments?fields=values.content,values.inline,values.id",
-		bb.baseURL, repoOwner, repoName, pr)
+		bb.BaseURL, repoOwner, repoName, pr)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
