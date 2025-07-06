@@ -83,14 +83,16 @@ func (l LineLevel) String(provider string, client *git.Client, commitHash string
 		var suggestionStr string
 		switch provider {
 		case "bitbucket":
-			for line := range strings.SplitSeq(l.Suggestion, "\n") {
-				suggestionStr += fmt.Sprintf("+%s\n", line)
-			}
-			suggestionStr = "```diff\n" + suggestionStr + "```"
+			suggestionStr = "Replace with the following code:\n\n"
+			suggestionStr += "Current implementation\n"
+			suggestionStr += fmt.Sprintf("```\n%s\n```", l.Line)
+			suggestionStr += "\n\n"
+			suggestionStr += "Suggested changes\n"
+			suggestionStr += fmt.Sprintf("```\n%s\n```", l.Suggestion)
 		case "github":
 			suggestionStr = "```suggestion\n" + l.Suggestion + "\n```"
 		}
-		body = append(body, fmt.Sprintf("**🔄 Suggestion:**\n%s", suggestionStr))
+		body = append(body, fmt.Sprintf("🔄 Suggestion:\n%s", suggestionStr))
 	}
 	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), strings.Join(body, "\n\n"))
 }
