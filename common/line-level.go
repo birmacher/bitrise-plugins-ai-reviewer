@@ -71,7 +71,7 @@ func (l LineLevel) String(provider string, client *git.Client, commitHash string
 
 	if provider == "bitbucket" {
 		if len(l.Prompt) > 0 {
-			body = append(body, fmt.Sprintf("**🤖 Prompt for AI Agents:**\n\n```\n%s\n```\n\n", l.getAIPrompt()))
+			body = append(body, fmt.Sprintf("🤖 Prompt for AI Agents:\n\n```\n%s\n```\n\n", l.getAIPrompt()))
 		}
 	} else {
 		if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
