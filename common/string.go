@@ -3,6 +3,8 @@ package common
 import (
 	"bufio"
 	"strings"
+
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 func WrapString(s string, width int) string {
@@ -28,11 +30,14 @@ func WrapString(s string, width int) string {
 }
 
 func GetIndentation(line string) string {
+	logger.Debug("GetIndentation called with line:", line)
 	for i, c := range line {
 		if c != ' ' && c != '\t' {
+			logger.Debugf("Indentation found: `%s`", line[:i])
 			return line[:i]
 		}
 	}
+	logger.Debug("No indentation found")
 	return ""
 }
 
