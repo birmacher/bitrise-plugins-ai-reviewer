@@ -95,10 +95,6 @@ func GetIndentationString(fileSource string) string {
 }
 
 func ReplaceTabIndentation(input, indentation, prefix string) string {
-	if input == "" || indentation == "" {
-		return input
-	}
-
 	lines := strings.Split(input, "\n")
 	for i, line := range lines {
 		// Count leading tabs
@@ -111,10 +107,7 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 			}
 		}
 
-		if tabCount > 0 {
-			// Replace all leading tabs with the correct amount of indentation
-			lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
-		}
+		lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
 	}
 	return strings.Join(lines, "\n")
 }

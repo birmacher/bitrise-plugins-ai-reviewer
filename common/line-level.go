@@ -111,7 +111,7 @@ func (l LineLevel) IsMultiline() bool {
 	normalizedLine := strings.ReplaceAll(strings.ReplaceAll(l.Line, "\r\n", "\n"), "\r", "\n")
 	trimmedLine := strings.TrimRight(normalizedLine, "\n")
 
-	return strings.Contains(trimmedLine, "\n")
+	return len(strings.Split(trimmedLine, "\n")) > 1
 }
 
 // FirstLine returns the first line of the content
