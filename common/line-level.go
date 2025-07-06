@@ -8,12 +8,13 @@ import (
 )
 
 const (
-	CategoryIssue         = "issue"
+	CategoryBug           = "bug"
 	CategoryRefactor      = "refactor"
 	CategoryImprovement   = "improvement"
 	CategoryDocumentation = "documentation"
 	CategoryNitpick       = "nitpick"
 	CategoryTestCoverage  = "test coverage"
+	CategorySecurity      = "security"
 )
 
 // LineLevel represents a review comment for a specific line of code
@@ -132,8 +133,8 @@ func (l LineLevel) LastLine() string {
 
 func (l LineLevel) getCategoryString() string {
 	switch l.Category {
-	case CategoryIssue:
-		return "⚠️ Potential Issue"
+	case CategoryBug:
+		return "🐛 Bug"
 	case CategoryRefactor:
 		return "🔧 Refactor Suggestion"
 	case CategoryImprovement:
@@ -144,6 +145,8 @@ func (l LineLevel) getCategoryString() string {
 		return "🧹 Nitpick"
 	case CategoryTestCoverage:
 		return "🧪 Test Coverage"
+	case CategorySecurity:
+		return "🔒 Security Issue"
 	}
 
 	return ""
