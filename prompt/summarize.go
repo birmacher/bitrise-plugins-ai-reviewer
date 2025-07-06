@@ -11,15 +11,19 @@ func GetSummarizePrompt(settings common.Settings) string {
 ` + getSummary(settings) + `
 ` + getWalkthrough(settings) + `
 ## Line Feedback
-A list of issues found in the diff hunks. Return the file ("file"), short title of the issue ("title"), category ("category"), brief description of the issue ("issue") and the exact line content ("content") you are commenting on.
-Only include lines that appear in the diff hunk. Do not make up lines.
-Quote the entire target line exactly as it appears in the diff.
-Don't comment on lines that you already gave suggestion on.
-Add a Prompt to AI Agents as "prompt" field. This should be a short, clear instruction for an AI agent to fix the issue. Don't include the file or line number in the prompt, just the prompt itself.
-If you know how to fix the issue, you can include a "suggestion" field with a code snippet that fixes the issue. The suggestion should replace the flagged line(s) content. Suggestions should be valid code, always with "\t" indentation. Avoid adding just comments.
-
-Focus on bugs, smells, security issues, and code quality improvements.
-Categorize the issues as "issue", "refactor", improvement, "documentation", "nitpick", "test coverage"
+Return a list of issues found in the diff hunks, formatted as objects with these fields:
+- "file": File path where the issue appears.
+- "title": Short title of the issue.
+- "category": One of "bug", "refactor", "improvement", "documentation", "nitpick", "test coverage", or "security".
+- "issue": Brief description of the issue.
+- "content": The exact line from the diff hunk that you are commenting on.
+- "prompt": A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).
+- (Optional) "suggestion": A valid code snippet that fully replaces the line(s) in "content". Only provide a suggestion if you know the correct fix. Match the indentation style of the project.
+Guidelines:
+- Only include lines present in the diff hunk. Do not make up or synthesize lines.
+- Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
+- For "nitpick", only flag truly minor, non-blocking style suggestions.
+- If multiple lines should be replaced, the suggestion should include the full replacement block.
 ` + getHaiku(settings) + `
 ---
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
