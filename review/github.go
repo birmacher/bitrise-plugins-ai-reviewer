@@ -100,14 +100,14 @@ func (gh *GitHub) getComments(ctx context.Context, repoOwner, repoName string, p
 	return comments, err
 }
 
-func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (int64, error) {
+func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (int64, string, error) {
 	// Check if summary already exists
 	for _, c := range comments {
 		if c.Body != nil && strings.HasPrefix(*c.Body, header) {
-			return *c.ID, nil
+			return *c.ID, *c.Body, nil
 		}
 	}
-	return 0, nil
+	return 0, "", nil
 }
 
 func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body string) error {
@@ -124,7 +124,7 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 		return errors.New(errMsg)
 	}
 
-	commentID, err := gh.getComment(comments, header)
+	commentID, body, err := gh.getComment(comments, header)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
 		logger.Errorf(errMsg)
@@ -137,6 +137,10 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 
 	if commentID > 0 {
 		logger.Debugf("Found existing comment with ID: %d. Updating it", commentID)
+
+		expandedComment := *comment.Body + "\n\n" + body
+		comment.Body = &expandedComment
+
 		_, _, err = gh.client.Issues.EditComment(
 			ctx,
 			repoOwner,
@@ -231,7 +235,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
-		commentID, err := gh.getComment(comments, ll.Header(client, commitHash))
+		commentID, _, err := gh.getComment(comments, ll.Header(client, commitHash))
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
 			logger.Errorf(errMsg)

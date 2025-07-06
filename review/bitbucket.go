@@ -118,13 +118,13 @@ func (bb *Bitbucket) getComments(ctx context.Context, repoOwner, repoName string
 }
 
 // getComment checks if a comment with the specified header already exists
-func (bb *Bitbucket) getComment(comments []CommentResponse, header string) (int, error) {
+func (bb *Bitbucket) getComment(comments []CommentResponse, header string) (int, string, error) {
 	for _, c := range comments {
 		if strings.HasPrefix(c.Content.Raw, header) {
-			return c.ID, nil
+			return c.ID, c.Content.Raw, nil
 		}
 	}
-	return 0, nil
+	return 0, "", nil
 }
 
 // PostSummary adds or updates a summary comment on a Bitbucket pull request
@@ -142,7 +142,7 @@ func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, bod
 		return errors.New(errMsg)
 	}
 
-	commentID, err := bb.getComment(comments, header)
+	commentID, body, err := bb.getComment(comments, header)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
 		logger.Errorf(errMsg)
@@ -177,6 +177,9 @@ func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, bod
 		// Update existing comment
 		apiURL = fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments/%d",
 			bb.BaseURL, repoOwner, repoName, pr, commentID)
+
+		commentData.Content.Raw = commentData.Content.Raw + "\n\n" + body
+
 		req, err = http.NewRequestWithContext(ctx, "PUT", apiURL, strings.NewReader(string(jsonData)))
 		logger.Debugf("Updating existing comment with ID: %d", commentID)
 	} else {
@@ -285,7 +288,7 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 		}
 
 		// Check if we've already added this comment in this PR
-		commentID, err := bb.getComment(comments, ll.Header(client, commitHash))
+		commentID, _, err := bb.getComment(comments, ll.Header(client, commitHash))
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
 			logger.Errorf(errMsg)

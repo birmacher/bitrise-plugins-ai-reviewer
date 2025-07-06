@@ -67,13 +67,16 @@ func (s Summary) String(provider string, settings Settings) string {
 }
 
 // InitiatedString returns a message indicating the review has started
-func (s Summary) InitiatedString() string {
+func (s Summary) InitiatedString(provider string) string {
 	var builder strings.Builder
 	builder.WriteString(s.Header())
-	builder.WriteString("\n## Summary\n")
-	builder.WriteString(s.Summary)
-	builder.WriteString("\n\nReviewing the PR\n\n")
-	builder.WriteString("![](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYWplN3oxMjV0NDc0bW1lazBreGpibHRsZW40emFvZTMydTY2Mjg2bCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/7NoNw4pMNTvgc/200w.gif)")
+	switch provider {
+	case "github":
+		builder.WriteString("> [!NOTE]")
+		builder.WriteString("> Currently processing new changes in this PR, please wait...")
+	default:
+		builder.WriteString("> Currently processing new changes in this PR, please wait...")
+	}
 
 	return builder.String()
 }

@@ -61,7 +61,13 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			emptySummary := common.Summary{}
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, emptySummary.Header(), emptySummary.InitiatedString())
+			err = gitProvider.PostSummary(
+				repoOwner,
+				repoName,
+				pr,
+				emptySummary.Header(),
+				emptySummary.InitiatedString(gitProvider.GetProvider()),
+			)
 			if err != nil {
 				errMsg := fmt.Sprintf("Error posting initial review: %v", err)
 				logger.Errorf(errMsg)
