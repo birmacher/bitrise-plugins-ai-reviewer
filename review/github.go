@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
@@ -18,52 +18,32 @@ import (
 
 // GitHub implements the Reviewer interface for GitHub PRs
 type GitHub struct {
-	client   *github.Client
-	apiToken string
-	timeout  int
-	baseURL  string
+	*BaseReviewer
+	client *github.Client
 }
 
 // NewGitHub creates a new GitHub reviewer client
 func NewGitHub(opts ...Option) (Reviewer, error) {
 	logger.Debug("Creating new GitHub reviewer client")
 
+	baseReviewer, err := NewBaseReviewer(ProviderGitHub, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if githubURL := os.Getenv("GITHUB_API_URL"); githubURL != "" {
+		logger.Infof("Using GitHub Enterprise URL: %s", githubURL)
+		baseReviewer.BaseURL = githubURL
+	}
+
 	gh := &GitHub{
-		timeout: 60, // Default timeout
-	}
-
-	// Apply options
-	for _, opt := range opts {
-		switch opt.Type {
-		case APITokenOption:
-			if token, ok := opt.Value.(string); ok {
-				gh.apiToken = token
-				logger.Debug("GitHub API token configured")
-			}
-		case TimeoutOption:
-			if timeout, ok := opt.Value.(int); ok {
-				gh.timeout = timeout
-				logger.Debugf("GitHub API timeout set to %d seconds", timeout)
-			}
-		case BaseURLOption:
-			if baseURL, ok := opt.Value.(string); ok {
-				gh.baseURL = baseURL
-				logger.Debugf("GitHub Enterprise base URL configured: %s", baseURL)
-			}
-		}
-	}
-
-	// Validate required options
-	if gh.apiToken == "" {
-		errMsg := "GitHub API token is required"
-		logger.Error(errMsg)
-		return nil, errors.New(errMsg)
+		BaseReviewer: baseReviewer,
 	}
 
 	retryClient := common.NewRetryableClient(common.DefaultRetryConfig())
 	standardClient := retryClient.StandardClient()
 
-	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: gh.apiToken})
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: gh.ApiToken})
 	tc := oauth2.NewClient(context.Background(), ts)
 
 	tc.Transport = &oauth2.Transport{
@@ -71,15 +51,15 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 		Base:   standardClient.Transport,
 	}
 
-	if gh.baseURL != "" {
-		logger.Infof("Using GitHub Enterprise URL: %s", gh.baseURL)
-		apiURL, err := url.JoinPath(gh.baseURL, "api/v3")
+	if gh.BaseURL != "" {
+		logger.Infof("Using GitHub Enterprise URL: %s", gh.BaseURL)
+		apiURL, err := url.JoinPath(gh.BaseURL, "api/v3")
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to join API URL path: %v", err)
 			logger.Errorf(errMsg)
 			return nil, errors.New(errMsg)
 		}
-		uploadsURL, err := url.JoinPath(gh.baseURL, "uploads")
+		uploadsURL, err := url.JoinPath(gh.BaseURL, "uploads")
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to join uploads URL path: %v", err)
 			logger.Errorf(errMsg)
@@ -98,6 +78,15 @@ func NewGitHub(opts ...Option) (Reviewer, error) {
 
 	logger.Debug("GitHub reviewer client created successfully")
 	return gh, nil
+}
+
+// GetProvider returns the name of the review provider
+func (gh *GitHub) GetProvider() string {
+	return ProviderGitHub
+}
+
+func (gh *GitHub) SupportCollapsibleMarkdown() bool {
+	return true
 }
 
 func (gh *GitHub) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]*github.IssueComment, error) {
@@ -124,7 +113,7 @@ func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (in
 func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body string) error {
 	logger.Infof("Posting summary to PR #%d in %s/%s", pr, repoOwner, repoName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	ctx, cancel := gh.CreateTimeoutContext()
 	defer cancel()
 
 	logger.Debug("Fetching existing comments to check for duplicates")
@@ -185,7 +174,7 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error {
 	logger.Infof("Posting line feedback to PR #%d in %s/%s, commit: %s", pr, repoOwner, repoName, commitHash)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	ctx, cancel := gh.CreateTimeoutContext()
 	defer cancel()
 
 	// Check for existing comments
@@ -253,7 +242,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 			continue
 		}
 
-		reviewBody := ll.String(client, commitHash)
+		reviewBody := ll.String(gh.GetProvider(), client, commitHash)
 		reviewComment := &github.DraftReviewComment{
 			Path: &ll.File,
 			Line: &ll.LineNumber,
@@ -268,47 +257,20 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 		reviewComments = append(reviewComments, reviewComment)
 	}
 
-	// Nitpick comment
-	for _, ll := range lineFeedback.GetNitpickFeedback() {
-		if ll.File == "" || ll.LineNumber <= 0 {
-			continue
-		}
-		if nitpickCommentsByFile[ll.File] == nil {
-			nitpickCommentsByFile[ll.File] = []common.LineLevel{}
-		}
-		nitpickCommentsByFile[ll.File] = append(nitpickCommentsByFile[ll.File], ll)
+	// Process nitpick comments
+	var processErr error
+	nitpickCommentsByFile, processErr = ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
+	if processErr != nil {
+		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", processErr)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
-	nitpickComment := strings.Builder{}
-	for filepath, comments := range nitpickCommentsByFile {
-		nitpickComment.WriteString("<details>\n")
-		nitpickComment.WriteString("<summary>" + filepath + " (" + strconv.Itoa(len(comments)) + ")</summary>\n\n")
-		for _, c := range comments {
-			line := fmt.Sprintf("%d", c.LineNumber)
-			if c.IsMultiline() {
-				line = line + "-" + fmt.Sprintf("%d", c.LastLineNumber)
-			}
-			nitpickComment.WriteString("<!-- bitrise-plugin-ai-reviewer: " + filepath + ":" + line + " -->\n")
-			nitpickComment.WriteString("`" + line + "`: **" + c.Title + "**\n\n")
-			nitpickComment.WriteString(c.Body + "\n\n")
-		}
-		nitpickComment.WriteString("</details>\n\n")
-
-		nitpickComments = append(nitpickComments, nitpickComment.String())
-	}
+	// Format nitpick comments for display
+	nitpickComments = FormatNitpickComments(gh.GetProvider(), nitpickCommentsByFile)
 
 	if len(reviewComments) > 0 {
-		overallReview := strings.Builder{}
-		overallReview.WriteString("_This is an AI-generated review. Please review it carefully._\n\n")
-		overallReview.WriteString(fmt.Sprintf("**Actionable comments posted: %d**\n\n", len(reviewComments)))
-		if len(nitpickComments) > 0 {
-			overallReview.WriteString("<details>\n")
-			overallReview.WriteString("<summary>🧹 Nitpick comments</summary>\n")
-			overallReview.WriteString(strings.Join(nitpickComments, "\n\n---\n\n"))
-			overallReview.WriteString("</details>\n\n")
-		}
-
-		overallReviewStr := overallReview.String()
+		overallReviewStr := FormatOverallReview(len(reviewComments), nitpickComments)
 		review := &github.PullRequestReviewRequest{
 			CommitID: &commitHash,
 			Body:     &overallReviewStr,
@@ -336,7 +298,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 }
 
 func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) ([]common.LineLevel, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(gh.timeout)*time.Second)
+	ctx, cancel := gh.CreateTimeoutContext()
 	defer cancel()
 
 	lineReviews := make([]common.LineLevel, 0)

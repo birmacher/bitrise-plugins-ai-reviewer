@@ -3,6 +3,8 @@ package common
 import (
 	"bufio"
 	"strings"
+
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 func WrapString(s string, width int) string {
@@ -28,11 +30,14 @@ func WrapString(s string, width int) string {
 }
 
 func GetIndentation(line string) string {
+	logger.Debug("GetIndentation called with line:", line)
 	for i, c := range line {
 		if c != ' ' && c != '\t' {
+			logger.Debugf("Indentation found: `%s`", line[:i])
 			return line[:i]
 		}
 	}
+	logger.Debug("No indentation found")
 	return ""
 }
 
@@ -95,10 +100,6 @@ func GetIndentationString(fileSource string) string {
 }
 
 func ReplaceTabIndentation(input, indentation, prefix string) string {
-	if input == "" || indentation == "" {
-		return input
-	}
-
 	lines := strings.Split(input, "\n")
 	for i, line := range lines {
 		// Count leading tabs
@@ -111,10 +112,7 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 			}
 		}
 
-		if tabCount > 0 {
-			// Replace all leading tabs with the correct amount of indentation
-			lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
-		}
+		lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
 	}
 	return strings.Join(lines, "\n")
 }

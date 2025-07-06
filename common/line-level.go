@@ -8,12 +8,13 @@ import (
 )
 
 const (
-	CategoryIssue         = "issue"
+	CategoryBug           = "bug"
 	CategoryRefactor      = "refactor"
 	CategoryImprovement   = "improvement"
 	CategoryDocumentation = "documentation"
 	CategoryNitpick       = "nitpick"
 	CategoryTestCoverage  = "test coverage"
+	CategorySecurity      = "security"
 )
 
 // LineLevel represents a review comment for a specific line of code
@@ -50,11 +51,11 @@ func (l LineLevel) Header(client *git.Client, commitHash string) string {
 		}
 	}
 
-	return fmt.Sprintf("<!-- bitrise-plugin-ai-reviewer: %s:%s:%s -->", l.File, lineNumber, gitBlame)
+	return fmt.Sprintf("[bitrise-plugin-ai-reviewer]: %s:%s:%s", l.File, lineNumber, gitBlame)
 }
 
 // String formats the complete comment with header, body and suggestion
-func (l LineLevel) String(client *git.Client, commitHash string) string {
+func (l LineLevel) String(provider string, client *git.Client, commitHash string) string {
 	if l.File == "" || l.LineNumber <= 0 || l.Body == "" {
 		return ""
 	}
@@ -67,11 +68,31 @@ func (l LineLevel) String(client *git.Client, commitHash string) string {
 		body = append(body, fmt.Sprintf("**%s**", l.Title))
 	}
 	body = append(body, l.Body)
-	if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
-		body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n\n```\n%s\n```\n\n</details>", l.getAIPrompt()))
+
+	if provider == "bitbucket" {
+		if len(l.Prompt) > 0 {
+			body = append(body, fmt.Sprintf("🤖 Prompt for AI Agents:\n\n```\n%s\n```\n\n", l.getAIPrompt()))
+		}
+	} else {
+		if len(l.getCategoryString()) > 0 && l.getCategoryString() != CategoryNitpick && len(l.Prompt) > 0 {
+			body = append(body, fmt.Sprintf("<details>\n<summary>🤖 Prompt for AI Agents:</summary>\n\n```\n%s\n```\n\n</details>", l.getAIPrompt()))
+		}
 	}
+
 	if len(l.Suggestion) > 0 {
-		body = append(body, fmt.Sprintf("**Suggestion:**\n```suggestion\n%s\n```", l.Suggestion))
+		var suggestionStr string
+		switch provider {
+		case "bitbucket":
+			suggestionStr = "Replace with the following code:\n\n"
+			suggestionStr += "Current implementation\n"
+			suggestionStr += fmt.Sprintf("```\n%s\n```", l.Line)
+			suggestionStr += "\n\n"
+			suggestionStr += "Suggested changes\n"
+			suggestionStr += fmt.Sprintf("```\n%s\n```", l.Suggestion)
+		case "github":
+			suggestionStr = "```suggestion\n" + l.Suggestion + "\n```"
+		}
+		body = append(body, fmt.Sprintf("🔄 Suggestion:\n%s", suggestionStr))
 	}
 	return fmt.Sprintf("%s\n%s", l.Header(client, commitHash), strings.Join(body, "\n\n"))
 }
@@ -92,7 +113,7 @@ func (l LineLevel) IsMultiline() bool {
 	normalizedLine := strings.ReplaceAll(strings.ReplaceAll(l.Line, "\r\n", "\n"), "\r", "\n")
 	trimmedLine := strings.TrimRight(normalizedLine, "\n")
 
-	return strings.Contains(trimmedLine, "\n")
+	return len(strings.Split(trimmedLine, "\n")) > 1
 }
 
 // FirstLine returns the first line of the content
@@ -114,8 +135,8 @@ func (l LineLevel) LastLine() string {
 
 func (l LineLevel) getCategoryString() string {
 	switch l.Category {
-	case CategoryIssue:
-		return "⚠️ Potential Issue"
+	case CategoryBug:
+		return "🐛 Bug"
 	case CategoryRefactor:
 		return "🔧 Refactor Suggestion"
 	case CategoryImprovement:
@@ -126,6 +147,8 @@ func (l LineLevel) getCategoryString() string {
 		return "🧹 Nitpick"
 	case CategoryTestCoverage:
 		return "🧪 Test Coverage"
+	case CategorySecurity:
+		return "🔒 Security Issue"
 	}
 
 	return ""

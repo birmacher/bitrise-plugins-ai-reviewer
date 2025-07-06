@@ -20,17 +20,19 @@ type Summary struct {
 
 // Header returns the HTML comment that identifies this as a summary from the plugin
 func (s Summary) Header() string {
-	return "<!-- bitrise-plugin-ai-reviewer: summary -->"
+	return "[bitrise-plugin-ai-reviewer]: summary"
 }
 
 // String formats the complete summary as a markdown string
-func (s Summary) String(settings Settings) string {
+func (s Summary) String(provider string, settings Settings) string {
 	var builder strings.Builder
 	builder.WriteString(s.Header() + "\n\n")
 
-	if settings.Reviews.CollapseWalkthrough {
-		builder.WriteString("<details>\n")
-		builder.WriteString("<summary>📝 Summary of changes</summary>\n\n")
+	if provider == "github" {
+		if settings.Reviews.CollapseWalkthrough {
+			builder.WriteString("<details>\n")
+			builder.WriteString("<summary>📝 Summary of changes</summary>\n\n")
+		}
 	}
 
 	if settings.Reviews.Summary && len(s.Summary) > 0 {
@@ -44,14 +46,21 @@ func (s Summary) String(settings Settings) string {
 		builder.WriteString(formatWalkthrough(s.Walkthrough) + "\n")
 	}
 
-	if settings.Reviews.CollapseWalkthrough {
-		builder.WriteString("</details>\n\n")
+	if provider == "github" {
+		if settings.Reviews.CollapseWalkthrough {
+			builder.WriteString("</details>\n\n")
+		}
 	}
 
 	if settings.Reviews.Haiku && len(s.Haiku) > 0 {
+		haiku := s.Haiku
+		if provider == "bitbucket" {
+			haiku = strings.ReplaceAll(haiku, "\n", "  \n")
+		}
+
 		builder.WriteString("---\n")
 		builder.WriteString("### Haiku\n")
-		builder.WriteString(s.Haiku + "\n")
+		builder.WriteString(haiku + "\n")
 	}
 
 	return builder.String()
