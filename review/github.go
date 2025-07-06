@@ -124,7 +124,7 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 		return errors.New(errMsg)
 	}
 
-	commentID, body, err := gh.getComment(comments, header)
+	commentID, commentBody, err := gh.getComment(comments, header)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
 		logger.Errorf(errMsg)
@@ -138,7 +138,7 @@ func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body s
 	if commentID > 0 {
 		logger.Debugf("Found existing comment with ID: %d. Updating it", commentID)
 
-		expandedComment := *comment.Body + "\n\n" + body
+		expandedComment := *comment.Body + "\n\n" + commentBody
 		comment.Body = &expandedComment
 
 		_, _, err = gh.client.Issues.EditComment(

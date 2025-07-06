@@ -142,7 +142,7 @@ func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, bod
 		return errors.New(errMsg)
 	}
 
-	commentID, body, err := bb.getComment(comments, header)
+	commentID, commentBody, err := bb.getComment(comments, header)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
 		logger.Errorf(errMsg)
@@ -178,7 +178,7 @@ func (bb *Bitbucket) PostSummary(repoOwner, repoName string, pr int, header, bod
 		apiURL = fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments/%d",
 			bb.BaseURL, repoOwner, repoName, pr, commentID)
 
-		commentData.Content.Raw = commentData.Content.Raw + "\n\n" + body
+		commentData.Content.Raw = commentData.Content.Raw + "\n\n" + commentBody
 
 		req, err = http.NewRequestWithContext(ctx, "PUT", apiURL, strings.NewReader(string(jsonData)))
 		logger.Debugf("Updating existing comment with ID: %d", commentID)
