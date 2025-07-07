@@ -121,7 +121,7 @@ Set up your environment with the necessary API tokens:
 
 ```bash
 export GITHUB_TOKEN=your_github_personal_access_token
-export OPENAI_API_KEY=your_openai_api_key
+export LLM_API_KEY=your_openai_api_key
 ```
 
 For GitHub Enterprise, you can configure the API URL:
