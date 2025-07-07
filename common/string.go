@@ -7,13 +7,15 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
+// WrapString wraps a string to the specified width, attempting to break at spaces.
+// It returns a new string with newlines inserted to maintain the specified width.
 func WrapString(s string, width int) string {
 	var lines []string
 	for len(s) > width {
 		splitAt := width
 		// Try to split at the last space before the specified width
 		for i := width; i > 0; i-- {
-			if s[i] == ' ' {
+			if i < len(s) && s[i] == ' ' { // Added length check to prevent index out of range
 				splitAt = i
 				break
 			}
@@ -29,6 +31,8 @@ func WrapString(s string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// GetIndentation returns the leading whitespace (spaces and tabs) of a line.
+// It returns an empty string if there is no indentation.
 func GetIndentation(line string) string {
 	logger.Debug("GetIndentation called with line:", line)
 	for i, c := range line {
@@ -41,6 +45,9 @@ func GetIndentation(line string) string {
 	return ""
 }
 
+// DetectLogicalIndent analyzes text to determine the indentation style (spaces or tabs)
+// and the number of indentation characters commonly used.
+// Returns the indentation character and count, or empty strings and 0 if no pattern is found.
 func DetectLogicalIndent(text string) (string, int) {
 	if text == "" {
 		return "", 0
@@ -61,7 +68,7 @@ func DetectLogicalIndent(text string) (string, int) {
 			prevIndentLen = 0
 			continue
 		}
-		// Only spaces or tabs
+		// Determine indentation character (prefer the first one found)
 		if indentChar == "" && strings.HasPrefix(leading, " ") {
 			indentChar = " "
 		}
@@ -74,6 +81,13 @@ func DetectLogicalIndent(text string) (string, int) {
 		}
 		prevIndentLen = len(leading)
 	}
+
+	// Check for scanner errors
+	if err := scanner.Err(); err != nil {
+		logger.Debug("Error scanning text:", err)
+		return "", 0
+	}
+
 	// Find the most common diff
 	counts := map[int]int{}
 	for _, d := range diffs {
@@ -90,6 +104,8 @@ func DetectLogicalIndent(text string) (string, int) {
 	return indentChar, val
 }
 
+// GetIndentationString determines the indentation style of a file and returns
+// a string with the appropriate number of indentation characters.
 func GetIndentationString(fileSource string) string {
 	if fileSource == "" {
 		return ""
@@ -99,6 +115,8 @@ func GetIndentationString(fileSource string) string {
 	return strings.Repeat(indentationType, indentationCount)
 }
 
+// ReplaceTabIndentation replaces tab indentation with the specified indentation string
+// and adds an optional prefix to each line.
 func ReplaceTabIndentation(input, indentation, prefix string) string {
 	lines := strings.Split(input, "\n")
 	for i, line := range lines {

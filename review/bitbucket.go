@@ -117,6 +117,18 @@ func (bb *Bitbucket) getComments(ctx context.Context, repoOwner, repoName string
 	return response.Values, nil
 }
 
+func (bb *Bitbucket) getCommentBodyWithoutHeader(comments []CommentResponse, header string) (string, error) {
+	// Check if summary already exists
+	for _, c := range comments {
+		if strings.HasPrefix(c.Content.Raw, header) {
+			body := strings.TrimPrefix(c.Content.Raw, header)
+			body = strings.TrimSpace(body)
+			return body, nil
+		}
+	}
+	return "", nil
+}
+
 // getComment checks if a comment with the specified header already exists
 func (bb *Bitbucket) getComment(comments []CommentResponse, header string) (int, error) {
 	for _, c := range comments {
@@ -125,6 +137,38 @@ func (bb *Bitbucket) getComment(comments []CommentResponse, header string) (int,
 		}
 	}
 	return 0, nil
+}
+
+func (bb *Bitbucket) PostSummaryUnderReview(repoOwner, repoName string, pr int, header string) error {
+	logger.Infof("Summary under update for PR #%d in %s/%s", pr, repoOwner, repoName)
+
+	ctx, cancel := bb.CreateTimeoutContext()
+	defer cancel()
+
+	logger.Debug("Fetching existing comments to check for duplicates")
+	comments, err := bb.getComments(ctx, repoOwner, repoName, pr)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to list existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
+	}
+
+	commentBody, err := bb.getCommentBodyWithoutHeader(comments, header)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
+	}
+
+	underReviewStr := common.Summary{}.InitiatedString(bb.GetProvider())
+	err = bb.PostSummary(repoOwner, repoName, pr, header, underReviewStr+"\n\n"+commentBody)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to post summary under review: %v", err)
+		logger.Error(errMsg)
+		return errors.New(errMsg)
+	}
+
+	return nil
 }
 
 // PostSummary adds or updates a summary comment on a Bitbucket pull request
