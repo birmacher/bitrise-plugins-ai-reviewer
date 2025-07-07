@@ -15,17 +15,104 @@ This plugin helps to automate code reviews by using AI to analyze pull requests 
 
 ## Installation
 
+### Install plugin
+
 ```bash
 bitrise plugin install --source https://github.com/bitrise-io/bitrise-plugins-ai-reviewer
 ```
 
-Or you can install it from local source:
+### Install on Bitrise
 
-```bash
-git clone https://github.com/bitrise-io/bitrise-plugins-ai-reviewer.git
-cd bitrise-plugins-ai-reviewer
-go build -o bin/ai-reviewer
-bitrise plugin install --source .
+#### bitrise.yml
+
+This will be executed for all PR changes
+
+**Make sure to set this report "AI Review" as non-blocking on GitHub for merges**
+
+Pipeline
+```yaml
+pipelines:
+  ai-review-pipeline:
+    status_report_name:  AI Review
+    workflows:
+      ai_pr_summary: {}
+    triggers:
+      pull_request:
+      - target_branch: "*"
+```
+
+Workflow
+```yml
+ai_pr_summary:
+    meta:
+      bitrise.io:
+        machine_type_id: g2.linux.medium
+        stack: linux-docker-android-22.04
+    envs:
+    - GITHUB_TOKEN: $ADD_GITHUB_ACCESS_TOKEN
+    - LLM_API_KEY: $ADD_OPENAI_ACCESS_TOKEN
+    steps:
+    - git-clone@8.4.0:
+        title: Git clone
+    - script@1.2.1:
+        title: Generate AI Review for PR
+        inputs:
+        - content: |-            
+            #!/bin/bash
+            set -e
+
+            # Parse repository name from repo URL (works for SSH & HTTPS)
+            REPO_URL="${GIT_REPOSITORY_URL}"
+            REPO=$(echo "$REPO_URL" | sed -E 's#(git@|https://)([^/:]+)[/:]([^/]+)/([^.]+)(\.git)?#\3/\4#')
+
+            # 1. Unshallow the repo if it's a shallow clone (safe to run even if already full)
+            git fetch --unshallow || true
+
+            # 2. Fetch all branch refs (this ensures both the PR and the target/destination branch are present)
+            git fetch origin
+
+            # 3. Fetch both relevant branches explicitly for safety (redundant but safe)
+            git fetch origin "$BITRISEIO_GIT_BRANCH_DEST"
+            git fetch origin "$BITRISE_GIT_BRANCH"
+
+            # 4. Create/reset local branches to match the remote
+            git checkout -B "$BITRISEIO_GIT_BRANCH_DEST" "origin/$BITRISEIO_GIT_BRANCH_DEST"
+            git checkout -B "$BITRISE_GIT_BRANCH" "origin/$BITRISE_GIT_BRANCH"
+
+            # (Optionally: check out the PR branch if that is the branch you want to analyze)
+            git checkout "$BITRISE_GIT_BRANCH"
+
+            # 5. Install AI reviewer plugin (customize source as needed)
+            bitrise plugin install --source https://github.com/bitrise-io/bitrise-plugins-ai-reviewer.git
+
+            # 6. Run your AI reviewer (customize flags as needed)
+            bitrise :ai-reviewer summarize \
+              -m=gpt-4.1 \
+              -c="${GIT_CLONE_COMMIT_HASH}" \
+              -b="${BITRISEIO_GIT_BRANCH_DEST}" \
+              -r=github \
+              --pr="${BITRISE_PULL_REQUEST}" \
+              --repo="${REPO}"
+              --log-level=debug
+
+            echo "Done! PR reviewed."
+```
+
+#### Configure the plugin
+
+You can add a `review.bitrise.yml` file to the route directory to configure the plugin
+
+```yml
+language: "en-US"               # language to use
+tone_instructions: ""           # any additional instruction for the LLM on how to respond
+reviews:
+  profile: "chill"              # can be chill or assertive
+  summary: true                 # should it generate summary
+  walkthrough: true             # should it generate walkthrough
+  collapse_walkthrough: true    # should the summary and walkthrough collapsed
+  haiku: true                   # should it generate a haiku
+  path_filters: ""              # todo
+  path_instructions: ""         # todo
 ```
 
 ## Configuration
