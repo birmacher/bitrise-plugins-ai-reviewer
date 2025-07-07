@@ -75,13 +75,6 @@ func NewClient(runner Runner) *Client {
 }
 
 func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
-
-	commitHash, err := c.GetCommitHash(commitHash)
-	if err != nil {
-		errMsg := fmt.Sprintf("error getting commit hash: %v", err)
-		logger.Errorf(errMsg)
-		return "", errors.New(errMsg)
-	}
 	logger.Info("Using commit hash:", commitHash)
 
 	if targetBranch != "" {
@@ -98,38 +91,47 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error) {
 	logger.Info("Generating file contents...")
 
-	commitHash, err := c.GetCommitHash(commitHash)
+	resolvedCommitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
-		errMsg := fmt.Sprintf("error getting commit hash: %v", err)
-		logger.Errorf(errMsg)
-		return "", errors.New(errMsg)
+		return "", fmt.Errorf("error getting commit hash: %w", err)
 	}
-	logger.Info("Using commit hash:", commitHash)
+	logger.Info("Using commit hash:", resolvedCommitHash)
 
-	files, err := c.getChangedFilesForCommit(commitHash, targetBranch)
+	files, err := c.getChangedFilesForCommit(resolvedCommitHash, targetBranch)
 	if err != nil {
-		errMsg := fmt.Sprintf("error getting changed files: %v", err)
-		logger.Errorf(errMsg)
-		return "", errors.New(errMsg)
+		return "", fmt.Errorf("error getting changed files: %w", err)
 	}
 
-	fileOutput := []string{}
-	for _, filePath := range files {
-		logger.Debug("Processing file:", filePath)
-		output, err := c.getFileContent(commitHash, filePath)
-		if err != nil {
-			errMsg := fmt.Sprintf("error getting file content for %s: %v", filePath, err)
-			logger.Errorf(errMsg)
-			return "", errors.New(errMsg)
+	if len(files) == 0 {
+		logger.Info("No files changed in commit")
+		return "", nil
+	}
+
+	var fileOutput strings.Builder
+	for i, filePath := range files {
+		if filePath == "" {
+			continue // Skip empty file paths
 		}
-		if output == "" {
+
+		logger.Debug("Processing file:", filePath)
+		content, err := c.getFileContent(resolvedCommitHash, filePath)
+		if err != nil {
+			return "", fmt.Errorf("error getting file content for %s: %w", filePath, err)
+		}
+
+		if content == "" {
 			logger.Warn("File not found or empty:", filePath)
 			continue
 		}
-		fileOutput = append(fileOutput, fmt.Sprintf("===== FILE: %s =====\n%s\n===== END =====\n\n", filePath, output))
+
+		if i > 0 {
+			fileOutput.WriteString("\n\n")
+		}
+
+		fileOutput.WriteString(fmt.Sprintf("===== FILE: %s =====\n%s\n===== END =====\n", filePath, content))
 	}
 
-	return strings.Join(fileOutput, "\n\n"), nil
+	return fileOutput.String(), nil
 }
 
 // GetBlameForFileLine retrieves the commit hash that last modified the specified line in a file.
@@ -161,18 +163,16 @@ func (c *Client) GetBlameForFileLine(commitHash string, filePath string, lineNum
 func (c *Client) GetCommitHash(commitHash string) (string, error) {
 	if commitHash == "" {
 		logger.Debug("No commit hash provided, fetching current commit hash...")
-		ch, err := c.GetCurrentCommitHash()
-
-		if err != nil {
-			errMsg := fmt.Sprintf("error getting current commit hash: %v", err)
-			logger.Errorf(errMsg)
-			return "", errors.New(errMsg)
-		}
-
-		commitHash = ch
+		return c.GetCurrentCommitHash()
 	}
 
-	return commitHash, nil
+	// Validate that the commit hash exists and is valid
+	resolvedHash, err := c.runner.Run("git", "rev-parse", "--verify", commitHash+"^{commit}")
+	if err != nil {
+		return "", fmt.Errorf("invalid commit hash %s: %w", commitHash, err)
+	}
+
+	return resolvedHash, nil
 }
 
 func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
@@ -194,9 +194,7 @@ func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
 // GetDiffWithParent returns the diff between the current commit and its parent
 func (c *Client) GetDiffWithParent(commitHash string, fileOnly bool) (string, error) {
 	if commitHash == "" {
-		errMsg := "commit hash cannot be empty"
-		logger.Error(errMsg)
-		return "", errors.New(errMsg)
+		return "", errors.New("commit hash cannot be empty")
 	}
 
 	return c.getDiff(fmt.Sprintf("%s^..%s", commitHash, commitHash), fileOnly)
@@ -205,20 +203,20 @@ func (c *Client) GetDiffWithParent(commitHash string, fileOnly bool) (string, er
 // GetDiffWithMergeBase returns the diff between the current commit and the merge base with the provided branch
 func (c *Client) GetDiffWithMergeBase(commitHash, branchName string, fileOnly bool) (string, error) {
 	if commitHash == "" || branchName == "" {
-		errMsg := "commit hash and branch name cannot be empty"
-		logger.Error(errMsg)
-		return "", errors.New(errMsg)
+		return "", errors.New("commit hash and branch name cannot be empty")
 	}
 
 	// Find the merge base
 	mergeBase, err := c.runner.Run("git", "merge-base", commitHash, branchName)
 	if err != nil {
-		errMsg := fmt.Sprintf("error finding merge base between %s and %s: %v", commitHash, branchName, err)
-		logger.Errorf(errMsg)
-		return "", errors.New(errMsg)
+		return "", fmt.Errorf("error finding merge base between %s and %s: %w", commitHash, branchName, err)
 	}
 
-	return c.getDiff(fmt.Sprintf("%s..%s", mergeBase, commitHash), fileOnly)
+	if strings.TrimSpace(mergeBase) == "" {
+		return "", errors.New("empty merge base returned")
+	}
+
+	return c.getDiff(fmt.Sprintf("%s..%s", strings.TrimSpace(mergeBase), commitHash), fileOnly)
 }
 
 // GetCurrentCommitHash returns the hash of the current commit
@@ -229,33 +227,40 @@ func (c *Client) GetCurrentCommitHash() (string, error) {
 // GetChangedFiles returns a list of files changed between two commits
 func (c *Client) GetChangedFiles(from, to string) ([]string, error) {
 	if from == "" || to == "" {
-		errMsg := "from and to commits cannot be empty"
-		logger.Error(errMsg)
-		return nil, errors.New(errMsg)
+		return nil, errors.New("from and to commits cannot be empty")
 	}
 
 	output, err := c.getDiff(fmt.Sprintf("%s..%s", from, to), true)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting changed files between %s and %s: %w", from, to, err)
 	}
 
-	if output == "" {
+	if strings.TrimSpace(output) == "" {
 		return []string{}, nil
 	}
 
-	return strings.Split(output, "\n"), nil
+	// Filter out empty lines
+	files := strings.Split(output, "\n")
+	filteredFiles := make([]string, 0, len(files))
+	for _, file := range files {
+		if trimmed := strings.TrimSpace(file); trimmed != "" {
+			filteredFiles = append(filteredFiles, trimmed)
+		}
+	}
+
+	return filteredFiles, nil
 }
 
 func (c *Client) getFileContent(commitHash, filePath string) (string, error) {
 	if commitHash == "" || filePath == "" {
-		errMsg := "commit hash and file path cannot be empty"
-		logger.Error(errMsg)
-		return "", errors.New(errMsg)
+		return "", errors.New("commit hash and file path cannot be empty")
 	}
 
-	// check if the file exists in the commit
+	// Check if the file exists in the commit
 	output, err := c.runner.Run("git", "show", fmt.Sprintf("%s:%s", commitHash, filePath))
 	if err != nil {
+		// File might not exist in this commit, which is valid for deleted files
+		logger.Debugf("File %s not found in commit %s: %v", filePath, commitHash, err)
 		return "", nil
 	}
 
@@ -275,10 +280,21 @@ func (c *Client) getChangedFilesForCommit(commitHash, targetBranch string) ([]st
 	}
 
 	if err != nil {
-		errMsg := fmt.Sprintf("error getting changed files: %v", err)
-		logger.Errorf(errMsg)
-		return []string{}, errors.New(errMsg)
+		return nil, fmt.Errorf("error getting changed files: %w", err)
 	}
 
-	return strings.Split(diff, "\n"), nil
+	if strings.TrimSpace(diff) == "" {
+		return []string{}, nil
+	}
+
+	// Filter out empty lines
+	files := strings.Split(diff, "\n")
+	filteredFiles := make([]string, 0, len(files))
+	for _, file := range files {
+		if trimmed := strings.TrimSpace(file); trimmed != "" {
+			filteredFiles = append(filteredFiles, trimmed)
+		}
+	}
+
+	return filteredFiles, nil
 }
