@@ -4,11 +4,11 @@ A Bitrise CLI plugin for reviewing and summarizing code changes using AI.
 
 ## Overview
 
-This plugin helps to automate code reviews by using AI to analyze pull requests and provide feedback, suggestions, and potential issue detection. It uses the OpenAI API to generate insights about your code changes, with structured responses focusing on code quality, potential bugs, and performance issues.
+This plugin helps to automate code reviews by using AI to analyze pull requests and provide feedback, suggestions, and potential issue detection. It uses the OpenAI and Anthropic API to generate insights about your code changes, with structured responses focusing on code quality, potential bugs, and performance issues.
 
 ## Features
 
-- **PR Review**: Analyze GitHub pull requests for potential issues
+- **PR Review**: Analyze GitHub and Bitbucket pull requests for potential issues
 - **Code Summarization**: Generate concise summaries of code changes
 - **Line-by-Line Feedback**: Get specific feedback on individual code lines
 - **Integration with GitHub**: Automatically fetch PR details and provide feedback
