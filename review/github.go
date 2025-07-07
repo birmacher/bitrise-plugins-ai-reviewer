@@ -110,6 +110,50 @@ func (gh *GitHub) getComment(comments []*github.IssueComment, header string) (in
 	return 0, nil
 }
 
+func (gh *GitHub) getCommentBodyWithoutHeader(comments []*github.IssueComment, header string) (string, error) {
+	// Check if summary already exists
+	for _, c := range comments {
+		if c.Body != nil && strings.HasPrefix(*c.Body, header) {
+			body := strings.TrimPrefix(*c.Body, header)
+			body = strings.TrimSpace(body)
+			return body, nil
+		}
+	}
+	return "", nil
+}
+
+func (gh *GitHub) PostSummaryUnderReview(repoOwner, repoName string, pr int, header string) error {
+	logger.Infof("Summary under update for PR #%d in %s/%s", pr, repoOwner, repoName)
+
+	ctx, cancel := gh.CreateTimeoutContext()
+	defer cancel()
+
+	logger.Debug("Fetching existing comments to check for duplicates")
+	comments, err := gh.getComments(ctx, repoOwner, repoName, pr)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to list existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
+	}
+
+	commentBody, err := gh.getCommentBodyWithoutHeader(comments, header)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to check existing comments: %v", err)
+		logger.Errorf(errMsg)
+		return errors.New(errMsg)
+	}
+
+	underReviewStr := common.Summary{}.InitiatedString(gh.GetProvider())
+	err = gh.PostSummary(repoOwner, repoName, pr, header, underReviewStr+"\n\n"+commentBody)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to post summary under review: %v", err)
+		logger.Error(errMsg)
+		return errors.New(errMsg)
+	}
+
+	return nil
+}
+
 func (gh *GitHub) PostSummary(repoOwner, repoName string, pr int, header, body string) error {
 	logger.Infof("Posting summary to PR #%d in %s/%s", pr, repoOwner, repoName)
 

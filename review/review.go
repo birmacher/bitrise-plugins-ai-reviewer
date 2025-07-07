@@ -171,6 +171,7 @@ func ProcessLineFeedbackItems(
 type Reviewer interface {
 	GetProvider() string
 	SupportCollapsibleMarkdown() bool
+	PostSummaryUnderReview(repoOwner, repoName string, pr int, header string) error
 	PostSummary(repoOwner, repoName string, pr int, header, body string) error
 	PostLineFeedback(client *git.Client, repoOwner, repoName string, pr int, commitHash string, lineFeedback common.LineLevelFeedback) error
 	GetReviewRequestComments(repoOwner, repoName string, pr int) ([]common.LineLevel, error)

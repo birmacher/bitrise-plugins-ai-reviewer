@@ -60,8 +60,7 @@ var summarizeCmd = &cobra.Command{
 				return errors.New(errMsg)
 			}
 
-			emptySummary := common.Summary{}
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, emptySummary.Header(), emptySummary.InitiatedString())
+			err = gitProvider.PostSummaryUnderReview(repoOwner, repoName, pr, common.Summary{}.Header())
 			if err != nil {
 				errMsg := fmt.Sprintf("Error posting initial review: %v", err)
 				logger.Errorf(errMsg)
@@ -215,9 +214,8 @@ var summarizeCmd = &cobra.Command{
 
 					originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
 					if err != nil {
-						errMsg := fmt.Sprintf("Error getting original line for '%s': %v", ll.FirstLine(), err)
-						logger.Errorf(errMsg)
-						return errors.New(errMsg)
+						logger.Warnf("Error getting original line for '%s': %v", ll.FirstLine(), err)
+						continue
 					}
 					baseIndentation := common.GetIndentation(originalLine)
 
