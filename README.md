@@ -100,7 +100,7 @@ ai_pr_summary:
 
 #### Configure the plugin
 
-You can add a `review.bitrise.yml` file to the route directory to configure the plugin
+You can add a `review.bitrise.yml` file to the root directory to configure the plugin
 
 ```yml
 language: "en-US"               # language to use
