@@ -92,7 +92,7 @@ ai_pr_summary:
               -b="${BITRISEIO_GIT_BRANCH_DEST}" \
               -r=github \
               --pr="${BITRISE_PULL_REQUEST}" \
-              --repo="${REPO}"
+              --repo="${REPO}" \
               --log-level=debug
 
             echo "Done! PR reviewed."
