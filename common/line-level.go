@@ -61,14 +61,23 @@ func (l LineLevel) String(provider string, client *git.Client, commitHash string
 	}
 
 	body := []string{}
-	if len(l.getCategoryString()) > 0 {
-		body = append(body, fmt.Sprintf("_%s_", l.getCategoryString()))
+
+	// Setup title
+	title := []string{}
+	if category := l.getCategoryString(); category != "" {
+		title = append(title, category)
 	}
 	if l.Title != "" {
-		body = append(body, fmt.Sprintf("**%s**", l.Title))
+		title = append(title, l.Title)
 	}
+	if len(title) > 0 {
+		body = append(body, fmt.Sprintf("**%s**", strings.Join(title, ": ")))
+	}
+
+	// Setup issue body
 	body = append(body, l.Body)
 
+	// Setup helpers
 	if provider == "bitbucket" {
 		if len(l.Prompt) > 0 {
 			body = append(body, fmt.Sprintf("🤖 Prompt for AI Agents:\n\n```\n%s\n```\n\n", l.getAIPrompt()))
