@@ -29,21 +29,18 @@ This will be executed for all PR changes
 
 **Make sure to set this report "AI Review" as non-blocking on GitHub for merges**
 
-Pipeline
-```yaml
-pipelines:
-  ai-review-pipeline:
-    status_report_name:  AI Review
-    workflows:
-      ai_pr_summary: {}
-    triggers:
-      pull_request:
-      - target_branch: "*"
-```
-
-Workflow
 ```yml
-ai_pr_summary:
+#workflows:
+  ai_pr_summary:
+    triggers:
+      # run for pull requests; changed_files filter exposes the list of changed files
+      pull_request:
+      - target_branch: '*'
+        source_branch: '*'
+        changed_files: '*'
+    # Set status_report_name to report the status of this workflow separately.
+    status_report_name: 'AI Review'
+    # Simple Medium Linux machine is enough
     meta:
       bitrise.io:
         machine_type_id: g2.linux.medium
@@ -52,8 +49,9 @@ ai_pr_summary:
     - GITHUB_TOKEN: $ADD_GITHUB_ACCESS_TOKEN
     - LLM_API_KEY: $ADD_OPENAI_ACCESS_TOKEN
     steps:
-    - git-clone@8.4.0:
-        title: Git clone
+    - activate-ssh-key@4:
+        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
+    - git-clone@8.4.0: {}
     - script@1.2.1:
         title: Generate AI Review for PR
         inputs:
