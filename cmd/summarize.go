@@ -206,11 +206,11 @@ var summarizeCmd = &cobra.Command{
 					indentation := common.GetIndentationStringFromFileContent(fileContent, ll.File)
 
 					originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
-					baseIndentation := originalLine[:len(originalLine)-len(strings.TrimLeft(originalLine, " \t"))]
-					if err != nil {
+					if err != nil || originalLine == "" {
 						logger.Warnf("Error getting original line for '%s': %v", ll.FirstLine(), err)
 						continue
 					}
+					baseIndentation := originalLine[:len(originalLine)-len(strings.TrimLeft(originalLine, " \t"))]
 
 					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
 				}

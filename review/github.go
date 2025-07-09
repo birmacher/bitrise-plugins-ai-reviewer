@@ -287,9 +287,9 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	// Process nitpick comments
-	nitpickCommentsByFile, processErr := ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
-	if processErr != nil {
-		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", processErr)
+	nitpickCommentsByFile, err := ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", err)
 		logger.Errorf(errMsg)
 		return errors.New(errMsg)
 	}
