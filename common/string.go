@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"fmt"
 	"strings"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
@@ -133,4 +134,43 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 		lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
 	}
 	return strings.Join(lines, "\n")
+}
+
+// EscapeJSON escapes special characters in a string to make it safe for JSON encoding.
+// It handles double quotes, backslashes, newlines, carriage returns, tabs, and other control characters.
+func EscapeJSON(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var result strings.Builder
+	result.Grow(len(s)) // Pre-allocate capacity
+
+	for _, r := range s {
+		switch r {
+		case '"':
+			result.WriteString(`\"`)
+		case '\\':
+			result.WriteString(`\\`)
+		case '\n':
+			result.WriteString(`\n`)
+		case '\r':
+			result.WriteString(`\r`)
+		case '\t':
+			result.WriteString(`\t`)
+		case '\b':
+			result.WriteString(`\b`)
+		case '\f':
+			result.WriteString(`\f`)
+		default:
+			// Handle other control characters
+			if r < 32 {
+				result.WriteString(fmt.Sprintf(`\u%04x`, r))
+			} else {
+				result.WriteRune(r)
+			}
+		}
+	}
+
+	return result.String()
 }

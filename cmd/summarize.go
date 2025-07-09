@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -135,6 +136,30 @@ var summarizeCmd = &cobra.Command{
 
 		logger.Debug("LLM Response:")
 		logger.Debug(resp.Content)
+
+		// Find all occurances of
+		// "content": "(...)",
+		// and string escape the content
+		// to avoid issues with JSON parsing
+		// Use regex to find and escape all "content": "..." values
+		re := regexp.MustCompile(`"content":\s*"(.*?)",`)
+		resp.Content = re.ReplaceAllStringFunc(resp.Content, func(match string) string {
+			submatches := re.FindStringSubmatch(match)
+			if len(submatches) < 2 {
+				return match
+			}
+			escaped := common.EscapeJSON(submatches[1])
+			return fmt.Sprintf(`"content": "%s",`, escaped)
+		})
+		re = regexp.MustCompile(`"suggestion":\s*"(.*?)",`)
+		resp.Content = re.ReplaceAllStringFunc(resp.Content, func(match string) string {
+			submatches := re.FindStringSubmatch(match)
+			if len(submatches) < 2 {
+				return match
+			}
+			escaped := common.EscapeJSON(submatches[1])
+			return fmt.Sprintf(`"suggestion": "%s",`, escaped)
+		})
 
 		// Send to the review provider
 		if codeReviewerName != "" {
