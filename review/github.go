@@ -408,7 +408,9 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 func (gh *GitHub) isDuplicateComment(ll common.LineLevel, client *git.Client, commitHash string, existingComments []common.LineLevel) (bool, error) {
 	blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
 	if err != nil {
-		return false, fmt.Errorf("failed to get blame for line: %v", err)
+		errMsg := fmt.Sprintf("Failed to check for duplicate comment: %v", err)
+		logger.Errorf(errMsg)
+		return false, errors.New(errMsg)
 	}
 
 	for _, existingComment := range existingComments {

@@ -120,7 +120,7 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 		lines[i] = line[:len(baseIndentation)]
 	}
 
-	indentationMarker := "  "
+	indentationMarker := "\t"
 	for i, line := range lines {
 		// Count leading indentationMarker occurrences
 		count := 0

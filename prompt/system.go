@@ -12,7 +12,7 @@ func GetSystemPrompt(settings common.Settings) string {
 - Focus feedback on correctness, logic, performance, maintainability, and security.
 - Ignore minor code style issues unless they cause confusion or bugs.
 - If the PR is excellent, end your summary with a positive remark or emoji.
-- Format full response as a well formatted, valid JSON object, don't wrap it in a code block. Line breaks and tabs must be escaped, do not add extra indentation`
+- Format full response as a well formatted, valid JSON object, don't wrap it in a code block.`
 	if settings.Language != "" && settings.Language != "en-US" {
 		basePrompt += fmt.Sprintf("\n- Use %s language.", settings.Language)
 	}
