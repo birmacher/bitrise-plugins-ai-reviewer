@@ -17,14 +17,15 @@ Return a list of issues found in the diff hunks, formatted as objects with these
 - "title": Short title of the issue.
 - "category": One of "bug", "refactor", "improvement", "documentation", "nitpick", "test coverage", or "security".
 - "issue": Brief description of the issue.
-- "content": The exact line from the diff hunk that you are commenting on.
+- "content": The exact line(s) from the diff hunk.
 - "prompt": A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).
-- (Optional) "suggestion": A valid code snippet that fully replaces the line(s) in "content". Only provide a suggestion if you know the correct fix. Match the indentation style of the project. Should be correctly indented, with 2 spaces "  ".
+- "suggestion": Optional. Code suggestion that would replace the line(s) in "content".
 Guidelines:
 - Only include lines present in the diff hunk. Do not make up or synthesize lines.
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
 - For "nitpick", only flag truly minor, non-blocking style suggestions.
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
+- "content" and "suggestion" **must** be a one-liner string, quoted with double quotes.
 ` + getHaiku(settings) + `
 ---
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
