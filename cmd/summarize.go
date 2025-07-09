@@ -138,6 +138,7 @@ var summarizeCmd = &cobra.Command{
 		logger.Debug(resp.Content)
 
 		// resp.Content = common.FixJSON(resp.Content)
+		resp.Content = common.Base64EncodeJSONValue(resp.Content, "haiku")
 		resp.Content = common.Base64EncodeJSONValue(resp.Content, "content")
 		resp.Content = common.Base64EncodeJSONValue(resp.Content, "suggestion")
 
@@ -151,6 +152,14 @@ var summarizeCmd = &cobra.Command{
 				errMsg := fmt.Sprintf("Error parsing summary response: %v", err)
 				logger.Errorf(errMsg)
 				return errors.New(errMsg)
+			}
+			if summary.Haiku != "" {
+				decodedHaiku, err := base64.StdEncoding.DecodeString(summary.Haiku)
+				if err != nil {
+					logger.Warnf("Error decoding base64 haiku: %v", err)
+				} else {
+					summary.Haiku = string(decodedHaiku)
+				}
 			}
 
 			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(gitProvider.GetProvider(), settings))
