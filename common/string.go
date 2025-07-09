@@ -2,7 +2,9 @@ package common
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
@@ -136,43 +138,29 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-// EscapeJSON escapes special characters in a string to make it safe for JSON encoding.
-// It handles double quotes, backslashes, newlines, carriage returns, tabs, and other control characters.
-func EscapeJSON(s string) string {
-	if s == "" {
-		return s
-	}
+// Add this function before the main command
+func CleanJSONResponse(jsonStr, key string) string {
+	// Handle "content" fields
+	pattern := fmt.Sprintf(`"%s":\s*"((?:[^"\\]|\\.)*)"\s*,`, key)
+	contentRe := regexp.MustCompile(pattern)
 
-	var result strings.Builder
-	result.Grow(len(s)) // Pre-allocate capacity
-
-	for _, r := range s {
-		switch r {
-		case '"':
-			result.WriteString(`\"`)
-		case '\\':
-			result.WriteString(`\\`)
-		case '`':
-			result.WriteString(`\u0060`) // Escape backticks as \u0060
-		case '\n':
-			result.WriteString(`\n`)
-		case '\r':
-			result.WriteString(`\r`)
-		case '\t':
-			result.WriteString(`\t`)
-		case '\b':
-			result.WriteString(`\b`)
-		case '\f':
-			result.WriteString(`\f`)
-		default:
-			// Handle other control characters
-			if r < 32 {
-				result.WriteString(fmt.Sprintf(`\u%04x`, r))
-			} else {
-				result.WriteRune(r)
-			}
+	jsonStr = contentRe.ReplaceAllStringFunc(jsonStr, func(match string) string {
+		submatches := contentRe.FindStringSubmatch(match)
+		if len(submatches) < 2 {
+			return match
 		}
-	}
+		// Use json.Marshal to properly escape the content
+		escaped, err := json.Marshal(submatches[1])
+		if err != nil {
+			return match // Return original if marshaling fails
+		}
+		// Remove the surrounding quotes that json.Marshal adds
+		if len(escaped) >= 2 {
+			escapedStr := string(escaped[1 : len(escaped)-1])
+			return fmt.Sprintf(`"%s": "%s",`, key, escapedStr)
+		}
+		return match
+	})
 
-	return result.String()
+	return jsonStr
 }
