@@ -156,8 +156,32 @@ func ProcessLineFeedbackItems(
 	// Process nitpick comments
 	for _, ll := range lineFeedback.GetNitpickFeedback() {
 		if ll.File == "" || ll.LineNumber <= 0 {
+			logger.Warnf("Skipping invalid nitpick feedback - file: %s, line: %d", ll.File, ll.LineNumber)
 			continue
 		}
+
+		// Check for duplicates against existing comments
+		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
+		if err != nil {
+			logger.Errorf("Failed to get blame for nitpick line %s:%d: %v", ll.File, ll.LineNumber, err)
+			continue
+		}
+
+		isDuplicate := false
+		for _, existingComment := range existingComments {
+			if ll.File == existingComment.File &&
+				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
+				blame == existingComment.CommitHash {
+				logger.Infof("Skipping existing nitpick comment for file: %s, line: %d", ll.File, ll.LineNumber)
+				isDuplicate = true
+				break
+			}
+		}
+
+		if isDuplicate {
+			continue
+		}
+
 		if nitpickCommentsByFile[ll.File] == nil {
 			nitpickCommentsByFile[ll.File] = []common.LineLevel{}
 		}

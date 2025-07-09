@@ -231,8 +231,6 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	reviewComments := make([]*github.DraftReviewComment, 0)
-	nitpickComments := make([]string, 0)
-	nitpickCommentsByFile := make(map[string][]common.LineLevel)
 
 	logger.Debug("Getting existing review comments")
 	addedComments, err := gh.GetReviewRequestComments(repoOwner, repoName, pr)
@@ -244,34 +242,21 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 
 	logger.Infof("Processing %d line feedback items", len(lineFeedback.GetLineFeedback()))
 	for _, ll := range lineFeedback.GetLineFeedback() {
-		skip := false
-
 		if ll.File == "" || ll.LineNumber <= 0 {
 			logger.Warnf("Skipping invalid line feedback - file: %s, line: %d", ll.File, ll.LineNumber)
 			continue
 		}
 
 		logger.Debugf("Getting blame for file: %s, line: %d", ll.File, ll.LineNumber)
-		blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
+		isDuplicate, err := gh.isDuplicateComment(ll, client, commitHash, addedComments)
 		if err != nil {
-			errMsg := fmt.Sprintf("Failed to get blame for line: %v", err)
+			errMsg := fmt.Sprintf("Failed to check for duplicate comment: %v", err)
 			logger.Errorf(errMsg)
 			return errors.New(errMsg)
 		}
 
-		for _, existingComment := range addedComments {
-			if ll.File == existingComment.File &&
-				ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
-				blame == existingComment.CommitHash {
-				logger.Infof("Skipping existing comment for file: %s, line: %d", ll.File, ll.LineNumber)
-				logger.Debugf("Existing comment:	line number: %d, last line number: %d, commit hash: %s", existingComment.LineNumber, existingComment.LastLineNumber, existingComment.CommitHash)
-				logger.Debugf("Line feedback: 		line number: %d, last line number: %d, commit hash: %s", ll.LineNumber, ll.LastLineNumber, blame)
-				skip = true
-				break
-			}
-		}
-
-		if skip {
+		if isDuplicate {
+			logger.Infof("Skipping existing comment for file: %s, line: %d", ll.File, ll.LineNumber)
 			continue
 		}
 
@@ -302,8 +287,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	// Process nitpick comments
-	var processErr error
-	nitpickCommentsByFile, processErr = ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
+	nitpickCommentsByFile, processErr := ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
 	if processErr != nil {
 		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", processErr)
 		logger.Errorf(errMsg)
@@ -311,9 +295,9 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	// Format nitpick comments for display
-	nitpickComments = FormatNitpickComments(gh.GetProvider(), nitpickCommentsByFile)
+	nitpickComments := FormatNitpickComments(gh.GetProvider(), nitpickCommentsByFile)
 
-	if len(reviewComments) > 0 {
+	if len(reviewComments) > 0 || len(nitpickComments) > 0 {
 		overallReviewStr := FormatOverallReview(len(reviewComments), nitpickComments)
 		review := &github.PullRequestReviewRequest{
 			CommitID: &commitHash,
@@ -418,4 +402,21 @@ func (gh *GitHub) GetReviewRequestComments(repoOwner, repoName string, pr int) (
 	}
 
 	return lineReviews, nil
+}
+
+// isDuplicateComment checks if a line-level comment already exists
+func (gh *GitHub) isDuplicateComment(ll common.LineLevel, client *git.Client, commitHash string, existingComments []common.LineLevel) (bool, error) {
+	blame, err := client.GetBlameForFileLine(commitHash, ll.File, ll.LineNumber)
+	if err != nil {
+		return false, fmt.Errorf("failed to get blame for line: %v", err)
+	}
+
+	for _, existingComment := range existingComments {
+		if ll.File == existingComment.File &&
+			ll.LineNumber >= existingComment.LineNumber && ll.LastLineNumber <= existingComment.LastLineNumber &&
+			blame == existingComment.CommitHash {
+			return true, nil
+		}
+	}
+	return false, nil
 }
