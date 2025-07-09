@@ -313,7 +313,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	// Format nitpick comments for display
 	nitpickComments = FormatNitpickComments(gh.GetProvider(), nitpickCommentsByFile)
 
-	if len(reviewComments) > 0 {
+	if len(reviewComments) > 0 || len(nitpickComments) > 0 {
 		overallReviewStr := FormatOverallReview(len(reviewComments), nitpickComments)
 		review := &github.PullRequestReviewRequest{
 			CommitID: &commitHash,
