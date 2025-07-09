@@ -19,7 +19,7 @@ Return a list of issues found in the diff hunks, formatted as objects with these
 - "issue": Brief description of the issue.
 - "content": The exact line from the diff hunk that you are commenting on.
 - "prompt": A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).
-- (Optional) "suggestion": A valid code snippet that fully replaces the line(s) in "content". Only provide a suggestion if you know the correct fix. Match the indentation style of the project. Should be correctly indented, always with "\t".
+- (Optional) "suggestion": A valid code snippet that fully replaces the line(s) in "content". Only provide a suggestion if you know the correct fix. Match the indentation style of the project. Should be correctly indented, always with "\\t".
 Guidelines:
 - Only include lines present in the diff hunk. Do not make up or synthesize lines.
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
