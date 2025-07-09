@@ -13,9 +13,9 @@ type Walkthrough struct {
 
 // Summary represents a comprehensive review summary with multiple components
 type Summary struct {
-	Summary     string        `json:"summary"`     // Overall summary of the changes
-	Walkthrough []Walkthrough `json:"walkthrough"` // Detailed walkthrough of individual file changes
-	Haiku       string        `json:"haiku"`       // Haiku celebrating the changes
+	Summary     string        `json:"summary,omitempty"`     // Overall summary of the changes
+	Walkthrough []Walkthrough `json:"walkthrough,omitempty"` // Detailed walkthrough of individual file changes
+	Haiku       string        `json:"haiku,omitempty"`       // Haiku celebrating the changes
 }
 
 // Header returns the HTML comment that identifies this as a summary from the plugin
