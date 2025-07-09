@@ -31,20 +31,6 @@ func WrapString(s string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
-// GetIndentation returns the leading whitespace (spaces and tabs) of a line.
-// It returns an empty string if there is no indentation.
-func GetIndentation(line string) string {
-	logger.Debug("GetIndentation called with line:", line)
-	for i, c := range line {
-		if c != ' ' && c != '\t' {
-			logger.Debugf("Indentation found: `%s`", line[:i])
-			return line[:i]
-		}
-	}
-	logger.Debug("No indentation found")
-	return ""
-}
-
 // DetectLogicalIndent analyzes text to determine the indentation style (spaces or tabs)
 // and the number of indentation characters commonly used.
 // Returns the indentation character and count, or empty strings and 0 if no pattern is found.
@@ -106,12 +92,16 @@ func DetectLogicalIndent(text string) (string, int) {
 
 // GetIndentationString determines the indentation style of a file and returns
 // a string with the appropriate number of indentation characters.
-func GetIndentationString(fileSource string) string {
-	if fileSource == "" {
+func GetIndentationStringFromFileContent(input, targetFile string) string {
+	logger.Debugf("Getting indentation for file: %s", targetFile)
+	fileSource, err := GetFileContentFromString(input, targetFile)
+	if err != nil {
 		return ""
 	}
 
 	indentationType, indentationCount := DetectLogicalIndent(fileSource)
+	logger.Debugf("Detected indentation type: '%s', count: %d", indentationType, indentationCount)
+
 	return strings.Repeat(indentationType, indentationCount)
 }
 
@@ -119,18 +109,28 @@ func GetIndentationString(fileSource string) string {
 // and adds an optional prefix to each line.
 func ReplaceTabIndentation(input, indentation, prefix string) string {
 	lines := strings.Split(input, "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+
+	baseIndentation := lines[0][:len(lines[0])-len(strings.TrimLeft(lines[0], " \t"))]
+
+	// Normalize all lines
 	for i, line := range lines {
-		// Count leading tabs
-		tabCount := 0
-		for j := 0; j < len(line); j++ {
-			if line[j] == '\t' {
-				tabCount++
-			} else {
-				break
-			}
+		lines[i] = line[:len(baseIndentation)]
+	}
+
+	indentationMarker := "  "
+	for i, line := range lines {
+		// Count leading indentationMarker occurrences
+		count := 0
+		for strings.HasPrefix(line, indentationMarker) {
+			count++
+			line = line[len(indentationMarker):]
 		}
 
-		lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
+		lines[i] = prefix + strings.Repeat(indentation, count) + line
 	}
+
 	return strings.Join(lines, "\n")
 }

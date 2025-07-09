@@ -203,21 +203,14 @@ var summarizeCmd = &cobra.Command{
 
 				// Get the file content to look up indentation
 				if ll.Suggestion != "" {
-					fileSource, err := common.GetFileContentFromString(fileContent, ll.File)
-					if err != nil {
-						errMsg := fmt.Sprintf("Error getting file content for '%s': %v", ll.File, err)
-						logger.Errorf(errMsg)
-						return errors.New(errMsg)
-					}
-					indentation := common.GetIndentationString(fileSource)
-					logger.Debug("Detected indentation '", indentation, "' for file ", ll.File)
+					indentation := common.GetIndentationStringFromFileContent(fileContent, ll.File)
 
 					originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
+					baseIndentation := originalLine[:len(originalLine)-len(strings.TrimLeft(originalLine, " \t"))]
 					if err != nil {
 						logger.Warnf("Error getting original line for '%s': %v", ll.FirstLine(), err)
 						continue
 					}
-					baseIndentation := common.GetIndentation(originalLine)
 
 					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
 				}
