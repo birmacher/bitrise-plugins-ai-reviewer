@@ -62,8 +62,8 @@ func (l LineLevel) String(provider string, client *git.Client, commitHash string
 	body := []string{}
 
 	// Setup header
-	if category := l.getCategoryString(); category != "" {
-		body = append(body, fmt.Sprintf("**%s**", category))
+	if l.getCategoryString() != "" {
+		body = append(body, fmt.Sprintf("**%s**", l.getCategoryString()))
 	}
 
 	// Setup issue body

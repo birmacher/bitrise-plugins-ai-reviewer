@@ -55,7 +55,8 @@ func getHaiku(settings common.Settings) string {
 	if settings.Reviews.Haiku {
 		return `## Haiku
 Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
-Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.`
+Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.
+Haiku **must** be a one-liner string, quoted with double quotes.`
 	}
 	return ""
 }
@@ -69,7 +70,7 @@ func getExampleResponse(settings common.Settings) string {
 	if settings.Reviews.Walkthrough {
 		response = append(response, "walkthrough: [\n{\nfiles: \"...\",\nsummary: \"...\"\n}\n]")
 	}
-	response = append(response, "line_feedback: [\n{\nfile: \"...\",\ncategory: \"...\",\nissue: \"...\",\ncontent: \"...\",\nprompt: \"...\",\nsuggestion: \"...\"\n}\n]")
+	response = append(response, "line_feedback: [\n  {\n    file: \"...\",\n    category: \"...\",\n    issue: \"...\",\n    content: \"...\",\n    prompt: \"...\",\n    suggestion: \"...\"\n  }\n]")
 	if settings.Reviews.Haiku {
 		response = append(response, "haiku: \"...\"")
 	}
