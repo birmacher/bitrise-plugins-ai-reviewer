@@ -8,7 +8,3 @@ reviews:
   haiku: true
   path_filters: ""
   path_instructions: ""
-  test: |
-    		hello world
-    			this is some more text
-    		this is some more text
