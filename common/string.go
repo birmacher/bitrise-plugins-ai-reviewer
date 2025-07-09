@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -162,5 +163,100 @@ func CleanJSONResponse(jsonStr, key string) string {
 		return match
 	})
 
+	// ...existing code...
 	return jsonStr
+}
+
+// ... (keep existing code until FixJSON)
+
+func FixJSON(jsonStr string) string {
+	var builder strings.Builder
+	builder.Grow(len(jsonStr))
+
+	inString := false
+	for i := 0; i < len(jsonStr); i++ {
+		char := jsonStr[i]
+
+		if char == '"' {
+			// Check if this quote is escaped
+			if i == 0 || jsonStr[i-1] != '\\' {
+				inString = !inString
+			}
+		}
+
+		if inString && char == '\\' {
+			// We are inside a string and found a backslash
+			if i+1 >= len(jsonStr) {
+				// Dangling backslash at the end of the string
+				builder.WriteByte(char)
+				continue
+			}
+
+			nextChar := jsonStr[i+1]
+			switch nextChar {
+			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+				// This is a valid escape sequence inside a string.
+				// Write both characters and skip the next one.
+				builder.WriteByte(char)
+				builder.WriteByte(nextChar)
+				i++
+			case 'u':
+				// Unicode escape, check for 4 hex digits
+				if i+5 < len(jsonStr) {
+					builder.WriteString(jsonStr[i : i+6])
+					i += 5
+				} else {
+					builder.WriteByte(char)
+				}
+			default:
+				// This is an invalid escape sequence (e.g., `\s`).
+				// Escape the backslash itself.
+				builder.WriteString(`\\`)
+			}
+		} else if inString && char < 32 {
+			// Unescaped control character inside a string
+			switch char {
+			case '\t':
+				builder.WriteString(`\t`)
+			case '\n':
+				builder.WriteString(`\n`)
+			case '\r':
+				builder.WriteString(`\r`)
+			case '\b':
+				builder.WriteString(`\b`)
+			case '\f':
+				builder.WriteString(`\f`)
+			default:
+				builder.WriteString(fmt.Sprintf(`\u%04x`, char))
+			}
+		} else {
+			// Character is not a special case, just write it.
+			builder.WriteByte(char)
+		}
+	}
+
+	return builder.String()
+}
+
+func Base64EncodeJSONValue(jsonStr, key string) string {
+	// This regex finds the key and captures its string value, handling escaped quotes.
+	pattern := fmt.Sprintf(`"%s":\s*"((?:\\.|[^"\\])*)"`, key)
+	re := regexp.MustCompile(pattern)
+
+	return re.ReplaceAllStringFunc(jsonStr, func(match string) string {
+		submatches := re.FindStringSubmatch(match)
+		if len(submatches) < 2 {
+			// Should not happen if the main regex matched, but as a safeguard.
+			return match
+		}
+
+		// The captured value is in submatches[1].
+		originalValue := submatches[1]
+
+		// Base64 encode the original value.
+		encodedValue := base64.StdEncoding.EncodeToString([]byte(originalValue))
+
+		// Return the key with the new Base64 encoded value.
+		return fmt.Sprintf(`"%s": "%s"`, key, encodedValue)
+	})
 }

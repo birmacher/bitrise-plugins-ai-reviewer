@@ -136,13 +136,9 @@ var summarizeCmd = &cobra.Command{
 		logger.Debug("LLM Response:")
 		logger.Debug(resp.Content)
 
-		// Find all occurances of
-		// "content": "(...)",
-		// and string escape the content
-		// to avoid issues with JSON parsing
-		// Use regex to find and escape all "content": "..." values
-		resp.Content = common.CleanJSONResponse(resp.Content, "content")
-		resp.Content = common.CleanJSONResponse(resp.Content, "suggestion")
+		// resp.Content = common.FixJSON(resp.Content)
+		resp.Content = common.Base64EncodeJSONValue(resp.Content, "content")
+		resp.Content = common.Base64EncodeJSONValue(resp.Content, "suggestion")
 
 		logger.Debug("Escaped LLM Response:")
 		logger.Debug(resp.Content)
