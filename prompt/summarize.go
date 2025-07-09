@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
@@ -27,7 +28,8 @@ Guidelines:
 ` + getHaiku(settings) + `
 ---
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
-` + getResponseFormat(settings)
+Example response:
+` + getExampleResponse(settings)
 }
 
 func getSummary(settings common.Settings) string {
@@ -41,8 +43,10 @@ A high-level, to-the-point, short summary of the overall change instead of speci
 func getWalkthrough(settings common.Settings) string {
 	if settings.Reviews.Walkthrough {
 		return `## Walkthrough
-A markdown table of file(s) (multiple files should be a string, separated with commas) and their summaries. Group files 
-with similar changes together into a single row to save space. Return the file name(s) ("files") and a brief summary of the changes ("summary") in each row.`
+An array of objects, each containing:
+- "files": A string of file names (multiple files should be comma-separated). Group files 
+with similar changes together into a single row to save space.
+- "summary": A brief summary of the changes made in that file.`
 	}
 	return ""
 }
@@ -56,17 +60,19 @@ Format the haiku as a quote using the ">" symbol and feel free to use emojis whe
 	return ""
 }
 
-func getResponseFormat(settings common.Settings) string {
-	headers := []string{}
+func getExampleResponse(settings common.Settings) string {
+	response := make([]string, 0)
+
 	if settings.Reviews.Summary {
-		headers = append(headers, "**summary**")
+		response = append(response, "summary: \"...\"")
 	}
 	if settings.Reviews.Walkthrough {
-		headers = append(headers, "**walkthrough**")
+		response = append(response, "walkthrough: [\n{\nfiles: \"...\",\nsummary: \"...\"\n}\n]")
 	}
-	headers = append(headers, "**line-feedback**")
+	response = append(response, "line_feedback: [\n{\nfile: \"...\",\ntitle: \"...\",\ncategory: \"...\",\nissue: \"...\",\ncontent: \"...\",\nprompt: \"...\",\nsuggestion: \"...\"\n}\n]")
 	if settings.Reviews.Haiku {
-		headers = append(headers, "**haiku**")
+		response = append(response, "haiku: \"...\"")
 	}
-	return strings.Join(headers, ", ")
+
+	return fmt.Sprintf("{\n%s\n}", strings.Join(response, ",\n"))
 }
