@@ -14,7 +14,6 @@ func GetSummarizePrompt(settings common.Settings) string {
 ## Line Feedback
 Return a list of issues found in the diff hunks, formatted as objects with these fields:
 - "file": File path where the issue appears.
-- "title": Short title of the issue.
 - "category": One of "bug", "refactor", "improvement", "documentation", "nitpick", "test coverage", or "security".
 - "issue": Brief description of the issue.
 - "content": The exact line(s) from the diff hunk.
@@ -70,7 +69,7 @@ func getExampleResponse(settings common.Settings) string {
 	if settings.Reviews.Walkthrough {
 		response = append(response, "walkthrough: [\n{\nfiles: \"...\",\nsummary: \"...\"\n}\n]")
 	}
-	response = append(response, "line_feedback: [\n{\nfile: \"...\",\ntitle: \"...\",\ncategory: \"...\",\nissue: \"...\",\ncontent: \"...\",\nprompt: \"...\",\nsuggestion: \"...\"\n}\n]")
+	response = append(response, "line_feedback: [\n{\nfile: \"...\",\ncategory: \"...\",\nissue: \"...\",\ncontent: \"...\",\nprompt: \"...\",\nsuggestion: \"...\"\n}\n]")
 	if settings.Reviews.Haiku {
 		response = append(response, "haiku: \"...\"")
 	}

@@ -132,7 +132,7 @@ func FormatNitpickComments(provider string, nitpickCommentsByFile map[string][]c
 				line = line + "-" + fmt.Sprintf("%d", c.LastLineNumber)
 			}
 			content.WriteString("<!-- bitrise-plugin-ai-reviewer: " + filepath + ":" + line + " -->\n")
-			content.WriteString("`" + line + "`: **" + c.Title + "**\n\n")
+			content.WriteString("`" + line + "`\n\n")
 			content.WriteString(c.Body + "\n\n")
 		}
 		content.WriteString("</details>\n\n")
