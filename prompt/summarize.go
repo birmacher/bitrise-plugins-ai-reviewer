@@ -16,9 +16,9 @@ Return a list of issues found in the diff hunks, formatted as objects with these
 - "title": Short title of the issue.
 - "category": One of "bug", "refactor", "improvement", "documentation", "nitpick", "test coverage", or "security".
 - "issue": Brief description of the issue.
-- "content": The exact line from the diff hunk that you are commenting on.
+- "content": ` + "```The exact line from the diff hunk that you are commenting on, wrapped in code block```" + `
 - "prompt": A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).
-- (Optional) "suggestion": A valid code snippet that fully replaces the line(s) in "content". Only provide a suggestion if you know the correct fix. Match the indentation style of the project. Should be correctly indented, always with "\t".
+- "suggestion": ` + "```(Optional) A valid code snippet that fixes the issue and replaces the code line(c) in \"content\", wrapped in code block.```" + `
 Guidelines:
 - Only include lines present in the diff hunk. Do not make up or synthesize lines.
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
