@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -167,6 +168,23 @@ var summarizeCmd = &cobra.Command{
 			}
 
 			for idx, ll := range lineLevel.Lines {
+				// Decide the code parts
+				decodedLine, err := base64.StdEncoding.DecodeString(lineLevel.Lines[idx].Line)
+				if err != nil {
+					logger.Warnf("Error decoding base64 line for file %s: %v", ll.File, err)
+					continue
+				}
+				lineLevel.Lines[idx].Line = string(decodedLine)
+
+				if ll.Suggestion != "" {
+					decodedLine, err := base64.StdEncoding.DecodeString(lineLevel.Lines[idx].Suggestion)
+					if err != nil {
+						logger.Warnf("Error decoding base64 line for file %s: %v", ll.File, err)
+						continue
+					}
+					lineLevel.Lines[idx].Suggestion = string(decodedLine)
+				}
+
 				// Get the line numbers
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
 				var lastLineNumber int
