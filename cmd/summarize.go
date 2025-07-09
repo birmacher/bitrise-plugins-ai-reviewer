@@ -161,6 +161,9 @@ var summarizeCmd = &cobra.Command{
 			return fmt.Sprintf(`"suggestion": "%s",`, escaped)
 		})
 
+		logger.Debug("Escaped LLM Response:")
+		logger.Debug(resp.Content)
+
 		// Send to the review provider
 		if codeReviewerName != "" {
 			summary := common.Summary{}

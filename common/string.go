@@ -152,6 +152,8 @@ func EscapeJSON(s string) string {
 			result.WriteString(`\"`)
 		case '\\':
 			result.WriteString(`\\`)
+		case '`':
+			result.WriteString(`\u0060`) // Escape backticks as \u0060
 		case '\n':
 			result.WriteString(`\n`)
 		case '\r':
