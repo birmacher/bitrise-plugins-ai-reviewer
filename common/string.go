@@ -117,7 +117,9 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 
 	// Normalize all lines
 	for i, line := range lines {
-		lines[i] = line[:len(baseIndentation)]
+		if len(line) > len(baseIndentation) {
+			lines[i] = line[len(baseIndentation):]
+		}
 	}
 
 	indentationMarker := "\t"
