@@ -148,8 +148,11 @@ var summarizeCmd = &cobra.Command{
 			if len(submatches) < 2 {
 				return match
 			}
-			escaped := common.EscapeJSON(submatches[1])
-			return fmt.Sprintf(`"content": "%s",`, escaped)
+			// Use json.Marshal to properly escape the content
+			escaped, _ := json.Marshal(submatches[1])
+			// Remove the surrounding quotes that json.Marshal adds
+			escapedStr := string(escaped[1 : len(escaped)-1])
+			return fmt.Sprintf(`"content": "%s",`, escapedStr)
 		})
 		re = regexp.MustCompile(`"suggestion":\s*"(.*?)",`)
 		resp.Content = re.ReplaceAllStringFunc(resp.Content, func(match string) string {
@@ -157,8 +160,11 @@ var summarizeCmd = &cobra.Command{
 			if len(submatches) < 2 {
 				return match
 			}
-			escaped := common.EscapeJSON(submatches[1])
-			return fmt.Sprintf(`"suggestion": "%s",`, escaped)
+			// Use json.Marshal to properly escape the content
+			escaped, _ := json.Marshal(submatches[1])
+			// Remove the surrounding quotes that json.Marshal adds
+			escapedStr := string(escaped[1 : len(escaped)-1])
+			return fmt.Sprintf(`"content": "%s",`, escapedStr)
 		})
 
 		logger.Debug("Escaped LLM Response:")
