@@ -134,13 +134,3 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-func SafeUnmarshal(s string) string {
-	// Replace backslashes with double backslashes
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	// Replace double quotes with escaped double quotes
-	s = strings.ReplaceAll(s, "\"", "\\\"")
-	// Replace newlines with escaped newlines
-	s = strings.ReplaceAll(s, "\n", "\\n")
-	return s
-}
