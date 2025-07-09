@@ -33,7 +33,7 @@ type LineLevel struct {
 
 // LineLevelFeedback represents a collection of line-level feedback items
 type LineLevelFeedback struct {
-	Lines []LineLevel `json:"line-feedback"` // List of line-level feedback items
+	Lines []LineLevel `json:"line_feedback"` // List of line-level feedback items
 }
 
 // Header generates a header string for the comment with file, line and blame information
