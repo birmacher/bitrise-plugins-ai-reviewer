@@ -66,7 +66,7 @@ func WithYamlFile() Settings {
 			for _, name := range filenames {
 				if !info.IsDir() && info.Name() == name {
 					filePath = path
-					return filepath.SkipDir
+					return filepath.SkipAll
 				}
 			}
 			return nil
