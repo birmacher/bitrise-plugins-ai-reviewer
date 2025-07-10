@@ -114,23 +114,3 @@ func GetIndentationString(fileSource string) string {
 	indentationType, indentationCount := DetectLogicalIndent(fileSource)
 	return strings.Repeat(indentationType, indentationCount)
 }
-
-// ReplaceTabIndentation replaces tab indentation with the specified indentation string
-// and adds an optional prefix to each line.
-func ReplaceTabIndentation(input, indentation, prefix string) string {
-	lines := strings.Split(input, "\n")
-	for i, line := range lines {
-		// Count leading tabs
-		tabCount := 0
-		for j := 0; j < len(line); j++ {
-			if line[j] == '\t' {
-				tabCount++
-			} else {
-				break
-			}
-		}
-
-		lines[i] = prefix + strings.Repeat(indentation, tabCount) + line[tabCount:]
-	}
-	return strings.Join(lines, "\n")
-}

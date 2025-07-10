@@ -291,8 +291,6 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 
 	// Track feedback that will be posted
 	lineComments := []PRComment{}
-	nitpickComments := []string{}
-	nitpickCommentsByFile := make(map[string][]common.LineLevel)
 
 	logger.Infof("Processing %d line feedback items", len(lineFeedback.GetLineFeedback()))
 	for _, ll := range lineFeedback.GetLineFeedback() {
@@ -369,7 +367,7 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 
 	// Process nitpick comments
 	var processErr error
-	nitpickCommentsByFile, processErr = ProcessLineFeedbackItems(bb.GetProvider(), client, commitHash, existingComments, lineFeedback)
+	nitpickCommentsByFile, processErr := ProcessLineFeedbackItems(bb.GetProvider(), client, commitHash, existingComments, lineFeedback)
 	if processErr != nil {
 		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", processErr)
 		logger.Errorf(errMsg)
@@ -377,7 +375,7 @@ func (bb *Bitbucket) PostLineFeedback(client *git.Client, repoOwner, repoName st
 	}
 
 	// Format nitpick comments for display
-	nitpickComments = FormatNitpickComments(bb.GetProvider(), nitpickCommentsByFile)
+	nitpickComments := FormatNitpickComments(bb.GetProvider(), nitpickCommentsByFile)
 
 	// Post all line comments
 	if len(lineComments) > 0 {

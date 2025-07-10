@@ -231,8 +231,6 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	reviewComments := make([]*github.DraftReviewComment, 0)
-	nitpickComments := make([]string, 0)
-	nitpickCommentsByFile := make(map[string][]common.LineLevel)
 
 	logger.Debug("Getting existing review comments")
 	addedComments, err := gh.GetReviewRequestComments(repoOwner, repoName, pr)
@@ -303,7 +301,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 
 	// Process nitpick comments
 	var processErr error
-	nitpickCommentsByFile, processErr = ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
+	nitpickCommentsByFile, processErr := ProcessLineFeedbackItems(gh.GetProvider(), client, commitHash, addedComments, lineFeedback)
 	if processErr != nil {
 		errMsg := fmt.Sprintf("Failed to process line feedback items: %v", processErr)
 		logger.Errorf(errMsg)
@@ -311,7 +309,7 @@ func (gh *GitHub) PostLineFeedback(client *git.Client, repoOwner, repoName strin
 	}
 
 	// Format nitpick comments for display
-	nitpickComments = FormatNitpickComments(gh.GetProvider(), nitpickCommentsByFile)
+	nitpickComments := FormatNitpickComments(gh.GetProvider(), nitpickCommentsByFile)
 
 	if len(reviewComments) > 0 || len(nitpickComments) > 0 {
 		overallReviewStr := FormatOverallReview(len(reviewComments), nitpickComments)
