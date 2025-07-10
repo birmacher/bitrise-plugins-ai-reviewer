@@ -21,9 +21,22 @@ type Summary struct {
 
 func ParseSummary(jsonData string) (Summary, error) {
 	summary := Summary{}
+
+	// Encode vialators as the LLM can respond with invalid JSON ( new lines and tabs)
+	jsonData = EncodeLLMKey(jsonData, "content")
+	jsonData = EncodeLLMKey(jsonData, "suggestion")
+	jsonData = EncodeLLMKey(jsonData, "haiku")
+
 	if err := json.Unmarshal([]byte(jsonData), &summary); err != nil {
 		return summary, fmt.Errorf("failed to parse summary JSON: %v", err)
 	}
+
+	haikuStr, err := DecodeLLMValue(summary.Haiku)
+	if err != nil {
+		return summary, fmt.Errorf("failed to decode haiku: %v", err)
+	}
+	summary.Haiku = haikuStr
+
 	return summary, nil
 }
 

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -34,6 +35,39 @@ type LineLevel struct {
 // LineLevelFeedback represents a collection of line-level feedback items
 type LineLevelFeedback struct {
 	Lines []LineLevel `json:"line-feedback"` // List of line-level feedback items
+}
+
+func ParseLineLevelFeedback(jsonData string) (LineLevelFeedback, error) {
+	llf := LineLevelFeedback{}
+
+	// Encode vialators as the LLM can respond with invalid JSON ( new lines and tabs)
+	jsonData = EncodeLLMKey(jsonData, "content")
+	jsonData = EncodeLLMKey(jsonData, "suggestion")
+	jsonData = EncodeLLMKey(jsonData, "haiku")
+
+	if err := json.Unmarshal([]byte(jsonData), &llf); err != nil {
+		return llf, fmt.Errorf("failed to parse LineLevelFeedback JSON: %v", err)
+	}
+
+	for idx, line := range llf.Lines {
+		// Decode the line content
+		decodedLine, err := DecodeLLMValue(line.Line)
+		if err != nil {
+			return llf, fmt.Errorf("failed to decode line content for file %s: %v", line.File, err)
+		}
+		llf.Lines[idx].Line = decodedLine
+
+		// Decode the suggestion if it exists
+		if line.Suggestion != "" {
+			decodedSuggestion, err := DecodeLLMValue(line.Suggestion)
+			if err != nil {
+				return llf, fmt.Errorf("failed to decode suggestion for file %s: %v", line.File, err)
+			}
+			llf.Lines[idx].Suggestion = decodedSuggestion
+		}
+	}
+
+	return llf, nil
 }
 
 // Header generates a header string for the comment with file, line and blame information

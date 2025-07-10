@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -152,9 +151,9 @@ var summarizeCmd = &cobra.Command{
 				return errors.New(errMsg)
 			}
 
-			lineLevel := common.LineLevelFeedback{}
-			if err = json.Unmarshal([]byte(resp.Content), &lineLevel); err != nil {
-				errMsg := fmt.Sprintf("Error parsing line-level response: %v", err)
+			lineLevel, err := common.ParseLineLevelFeedback(resp.Content)
+			if err != nil {
+				errMsg := fmt.Sprintf("Error posting summary: %v", err)
 				logger.Errorf(errMsg)
 				return errors.New(errMsg)
 			}
