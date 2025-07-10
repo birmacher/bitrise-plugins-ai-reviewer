@@ -61,10 +61,10 @@ func TestDetectLogicalIndent(t *testing.T) {
 
 	indentation, repetition = DetectLogicalIndent(string(spaceFile))
 	if indentation != " " {
-		t.Errorf("Expected tab indentation, got %s", indentation)
+		t.Errorf("Expected space indentation, got %s", indentation)
 	}
 	if repetition != 4 {
-		t.Errorf("Expected 1 repetition, got %d", repetition)
+		t.Errorf("Expected 4 repetition, got %d", repetition)
 	}
 }
 
