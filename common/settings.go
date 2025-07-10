@@ -3,6 +3,7 @@ package common
 import (
 	"os"
 
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -54,7 +55,9 @@ func WithYamlFile() Settings {
 	if filePath != "" {
 		data, err := os.ReadFile(filePath)
 		if err == nil {
-			yaml.Unmarshal(data, &settings)
+			if err := yaml.Unmarshal(data, &settings); err != nil {
+				logger.Infof("Failed to parse YAML file %s: %v", filePath, err)
+			}
 		}
 	}
 	return settings
