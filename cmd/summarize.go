@@ -232,7 +232,8 @@ var summarizeCmd = &cobra.Command{
 					logger.Debug("Original line found: '", originalLine, "'")
 
 					// Get the base indentation of the original line
-					common.FixIndentation(fileIndentation, originalLine, suggestionLines)
+					suggestionLines = common.FixIndentation(fileIndentation, originalLine, suggestionLines)
+					ll.Suggestion = strings.Join(suggestionLines, "\n")
 				}
 			}
 
