@@ -1,10 +1,10 @@
 language: "en-US"
 tone_instructions: ""
 reviews:
-  profile: "chill"
+  profile: "assertive"
   summary: true
   walkthrough: true
-  collapse_walkthrough: true
-  haiku: true
+  collapse_walkthrough: false
+  haiku: false
   path_filters: ""
   path_instructions: ""
