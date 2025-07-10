@@ -88,3 +88,128 @@ func TestGetIndentationString(t *testing.T) {
 		t.Errorf("Expected space indentation string, got %s", indentationStr)
 	}
 }
+
+func TestFixIndentation_Root(t *testing.T) {
+	suggestionLines := []string{
+		"func example() {",
+		"    fmt.Println(\"Hello, World!\")",
+		"}",
+	}
+
+	fileIndentation := "\t"
+	originalLine := "func example() {"
+
+	FixIndentation(fileIndentation, originalLine, suggestionLines)
+
+	expectedLines := []string{
+		"func example() {",
+		"    fmt.Println(\"Hello, World!\")",
+		"}",
+	}
+
+	for i, line := range suggestionLines {
+		if line != expectedLines[i] {
+			t.Errorf("Expected line %d to be '%s', got '%s'", i+1, expectedLines[i], line)
+		}
+	}
+}
+
+func TestFixIndentation_TabSameLevel(t *testing.T) {
+	suggestionLines := []string{
+		"\tfunc example() {",
+		"\t\tfmt.Println(\"Hello, World!\")",
+		"\t}",
+	}
+
+	fileIndentation := "\t"
+	originalLine := "\tfunc example() {"
+
+	FixIndentation(fileIndentation, originalLine, suggestionLines)
+
+	expectedLines := []string{
+		"	func example() {",
+		"		fmt.Println(\"Hello, World!\")",
+		"	}",
+	}
+
+	for i, line := range suggestionLines {
+		if line != expectedLines[i] {
+			t.Errorf("Expected line %d to be '%s', got '%s'", i+1, expectedLines[i], line)
+		}
+	}
+}
+
+func TestFixIndentation_TabIndented(t *testing.T) {
+	suggestionLines := []string{
+		"func example() {",
+		"	fmt.Println(\"Hello, World!\")",
+		"}",
+	}
+
+	fileIndentation := "\t"
+	originalLine := "\t\tfunc example() {"
+
+	FixIndentation(fileIndentation, originalLine, suggestionLines)
+
+	expectedLines := []string{
+		"		func example() {",
+		"			fmt.Println(\"Hello, World!\")",
+		"		}",
+	}
+
+	for i, line := range suggestionLines {
+		if line != expectedLines[i] {
+			t.Errorf("Expected line %d to be '%s', got '%s'", i+1, expectedLines[i], line)
+		}
+	}
+}
+
+func TestFixIndentation_SpaceSameLevel(t *testing.T) {
+	suggestionLines := []string{
+		"  func example() {",
+		"    fmt.Println(\"Hello, World!\")",
+		"  }",
+	}
+
+	fileIndentation := "  "
+	originalLine := "  func example() {"
+
+	FixIndentation(fileIndentation, originalLine, suggestionLines)
+
+	expectedLines := []string{
+		"  func example() {",
+		"    fmt.Println(\"Hello, World!\")",
+		"  }",
+	}
+
+	for i, line := range suggestionLines {
+		if line != expectedLines[i] {
+			t.Errorf("Expected line %d to be '%s', got '%s'", i+1, expectedLines[i], line)
+		}
+	}
+}
+
+func TestFixIndentation_SpaceIndented(t *testing.T) {
+	suggestionLines := []string{
+		"  func example() {",
+		"    fmt.Println(\"Hello, World!\")",
+		"  }",
+	}
+
+	fileIndentation := "  "
+	originalLine := "    func example() {"
+
+	FixIndentation(fileIndentation, originalLine, suggestionLines)
+
+	expectedLines := []string{
+		"    func example() {",
+		"      fmt.Println(\"Hello, World!\")",
+		"    }",
+	}
+
+	for i, line := range suggestionLines {
+		if line != expectedLines[i] {
+			t.Errorf("Expected line %d to be '%s', got '%s'", i+1, expectedLines[i], line)
+		}
+	}
+}

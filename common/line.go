@@ -16,6 +16,19 @@ type ChangedLine struct {
 	LineContent string
 }
 
+func GetFullLine(fileContent, diffContent, line string) string {
+	matches := getMatchingLines([]byte(fileContent), line)
+	changed := parseDiffChangedLines([]byte(diffContent), line)
+
+	for _, ln := range matches {
+		if changed[ln] {
+			return strings.Split(fileContent, "\n")[ln-1]
+		}
+	}
+
+	return ""
+}
+
 func GetOriginalLine(fileName string, fileContent []byte, diffContent []byte, matchLine string) (string, error) {
 	fileContentStr, err := GetFileContentFromString(string(fileContent), fileName)
 	if err != nil {

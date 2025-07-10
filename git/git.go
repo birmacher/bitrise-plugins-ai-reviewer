@@ -116,7 +116,7 @@ func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error
 	fileOutput := []string{}
 	for _, filePath := range files {
 		logger.Debug("Processing file:", filePath)
-		output, err := c.getFileContent(commitHash, filePath)
+		output, err := c.GetFileContent(commitHash, filePath)
 		if err != nil {
 			errMsg := fmt.Sprintf("error getting file content for %s: %v", filePath, err)
 			logger.Errorf(errMsg)
@@ -175,7 +175,17 @@ func (c *Client) GetCommitHash(commitHash string) (string, error) {
 	return commitHash, nil
 }
 
-func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
+func (c *Client) GetDiffForFile(commitHash, filePath string) (string, error) {
+	if commitHash == "" || filePath == "" {
+		errMsg := "commit hash and file path cannot be empty"
+		logger.Error(errMsg)
+		return "", errors.New(errMsg)
+	}
+
+	return c.getDiff(fmt.Sprintf("%s^..%s", commitHash, commitHash), false, "--", filePath)
+}
+
+func (c *Client) getDiff(commitRange string, fileOnly bool, additionalParams ...string) (string, error) {
 	params := []string{
 		"diff",
 		"--no-color",
@@ -188,6 +198,12 @@ func (c *Client) getDiff(commitRange string, fileOnly bool) (string, error) {
 	if fileOnly {
 		params = append(params, "--name-only")
 	}
+
+	// Add any additional parameters
+	if len(additionalParams) > 0 {
+		params = append(params, additionalParams...)
+	}
+
 	return c.runner.Run("git", params...)
 }
 
@@ -246,7 +262,7 @@ func (c *Client) GetChangedFiles(from, to string) ([]string, error) {
 	return strings.Split(output, "\n"), nil
 }
 
-func (c *Client) getFileContent(commitHash, filePath string) (string, error) {
+func (c *Client) GetFileContent(commitHash, filePath string) (string, error) {
 	if commitHash == "" || filePath == "" {
 		errMsg := "commit hash and file path cannot be empty"
 		logger.Error(errMsg)

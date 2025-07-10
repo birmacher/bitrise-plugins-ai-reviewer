@@ -202,23 +202,37 @@ var summarizeCmd = &cobra.Command{
 
 				// Get the file content to look up indentation
 				if ll.Suggestion != "" {
-					fileSource, err := common.GetFileContentFromString(fileContent, ll.File)
+					suggestionLines := strings.Split(ll.Suggestion, "\n")
+
+					// Get the file content to determine indentation
+					fileSource, err := git.GetFileContent(commitHash, ll.File)
 					if err != nil {
 						errMsg := fmt.Sprintf("Error getting file content for '%s': %v", ll.File, err)
 						logger.Errorf(errMsg)
 						return errors.New(errMsg)
 					}
-					indentation := common.GetIndentationString(fileSource)
-					logger.Debug("Detected indentation '", indentation, "' for file ", ll.File)
+					fileIndentation := common.GetIndentationString(fileSource)
+					logger.Debug("Detected indentation for file '", ll.File, "': '", fileIndentation, "'")
 
-					originalLine, err := common.GetOriginalLine(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())
+					// Get the file diff to check if the change is for the diff
+					fileDiff, err := git.GetDiffForFile(commitHash, ll.File)
 					if err != nil {
-						logger.Warnf("Error getting original line for '%s': %v", ll.FirstLine(), err)
+						errMsg := fmt.Sprintf("Error getting diff for file '%s': %v", ll.File, err)
+						logger.Errorf(errMsg)
+						return errors.New(errMsg)
+					}
+
+					// Check if the line is in the diff and get the original line
+					logger.Debug("Checking original line for '", ll.FirstLine(), "' in file '", ll.File, "'")
+					originalLine := common.GetFullLine(fileContent, fileDiff, ll.FirstLine())
+					if originalLine == "" {
+						logger.Warnf("No original line found for '%s' in file '%s'", ll.FirstLine(), ll.File)
 						continue
 					}
-					baseIndentation := common.GetIndentation(originalLine)
+					logger.Debug("Original line found: '", originalLine, "'")
 
-					ll.Suggestion = common.ReplaceTabIndentation(ll.Suggestion, indentation, baseIndentation)
+					// Get the base indentation of the original line
+					common.FixIndentation(fileIndentation, originalLine, suggestionLines)
 				}
 			}
 
