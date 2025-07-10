@@ -134,23 +134,3 @@ func ReplaceTabIndentation(input, indentation, prefix string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-func FixIndentation(fileIndentation, originalLine string, suggestionLines []string) []string {
-	baseIndentation := GetIndentation(originalLine)
-	suggestionBaseIndentationLength := len(GetIndentationString(suggestionLines[0]))
-
-	for i, line := range suggestionLines {
-		if len(line) > suggestionBaseIndentationLength {
-			suggestionLines[i] = line[suggestionBaseIndentationLength:]
-		}
-
-		indentChar := ""
-		for strings.HasPrefix(suggestionLines[i], "\t") {
-			indentChar += fileIndentation
-			suggestionLines[i] = suggestionLines[i][1:]
-		}
-		suggestionLines[i] = baseIndentation + indentChar + suggestionLines[i]
-	}
-
-	return suggestionLines
-}
