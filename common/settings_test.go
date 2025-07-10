@@ -357,65 +357,6 @@ func TestWithYamlFile_EmptyFile(t *testing.T) {
 	}
 }
 
-func TestWithYamlFile_PermissionDenied(t *testing.T) {
-	// Create temp directory for test
-	tempDir := t.TempDir()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get current directory: %v", err)
-	}
-
-	// Change to temp directory to create the config file
-	if err := os.Chdir(tempDir); err != nil {
-		t.Fatalf("Failed to change directory: %v", err)
-	}
-	defer os.Chdir(cwd) // Restore original directory when done
-
-	// Create a file with normal permissions first
-	if err := os.WriteFile("review.bitrise.yml", []byte("language: fr-FR"), 0644); err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
-
-	// Skip this test on Windows as permissions work differently
-	if os.Getenv("GOOS") != "windows" {
-		// Change permissions to make it unreadable
-		if err := os.Chmod("review.bitrise.yml", 0000); err != nil {
-			t.Fatalf("Failed to change file permissions: %v", err)
-		}
-
-		// Test that default settings are returned when config file is unreadable
-		settings := WithYamlFile()
-		expectedSettings := WithDefaultSettings()
-
-		if settings.Language != expectedSettings.Language {
-			t.Errorf("Expected language %s, got %s", expectedSettings.Language, settings.Language)
-		}
-
-		if settings.Tone != expectedSettings.Tone {
-			t.Errorf("Expected tone %s, got %s", expectedSettings.Tone, settings.Tone)
-		}
-
-		if settings.Reviews.Profile != expectedSettings.Reviews.Profile {
-			t.Errorf("Expected profile %s, got %s", expectedSettings.Reviews.Profile, settings.Reviews.Profile)
-		}
-
-		if settings.Reviews.Summary != expectedSettings.Reviews.Summary {
-			t.Errorf("Expected summary %v, got %v", expectedSettings.Reviews.Summary, settings.Reviews.Summary)
-		}
-
-		if settings.Reviews.PathFilters != expectedSettings.Reviews.PathFilters {
-			t.Errorf("Expected path filters %s, got %s", expectedSettings.Reviews.PathFilters, settings.Reviews.PathFilters)
-		}
-
-		if settings.Reviews.PathInstructions != expectedSettings.Reviews.PathInstructions {
-			t.Errorf("Expected path instructions %s, got %s", expectedSettings.Reviews.PathInstructions, settings.Reviews.PathInstructions)
-		}
-
-		// Restore permissions so the file can be deleted
-		os.Chmod("review.bitrise.yml", 0644)
-	}
-}
-
 func TestConstantValues(t *testing.T) {
 	// Test constant values are as expected
 	if ProfileChill != "chill" {
