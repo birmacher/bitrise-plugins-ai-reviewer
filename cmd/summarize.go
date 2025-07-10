@@ -138,9 +138,9 @@ var summarizeCmd = &cobra.Command{
 
 		// Send to the review provider
 		if codeReviewerName != "" {
-			summary := common.Summary{}
-			if err = json.Unmarshal([]byte(resp.Content), &summary); err != nil {
-				errMsg := fmt.Sprintf("Error parsing summary response: %v", err)
+			summary, err := common.ParseSummary(resp.Content)
+			if err != nil {
+				errMsg := fmt.Sprintf("Error parsing LLM Response for summary: %v", err)
 				logger.Errorf(errMsg)
 				return errors.New(errMsg)
 			}

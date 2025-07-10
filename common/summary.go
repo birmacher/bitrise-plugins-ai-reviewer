@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -16,6 +17,14 @@ type Summary struct {
 	Summary     string        `json:"summary"`     // Overall summary of the changes
 	Walkthrough []Walkthrough `json:"walkthrough"` // Detailed walkthrough of individual file changes
 	Haiku       string        `json:"haiku"`       // Haiku celebrating the changes
+}
+
+func ParseSummary(jsonData string) (Summary, error) {
+	summary := Summary{}
+	if err := json.Unmarshal([]byte(jsonData), &summary); err != nil {
+		return summary, fmt.Errorf("failed to parse summary JSON: %v", err)
+	}
+	return summary, nil
 }
 
 // Header returns the HTML comment that identifies this as a summary from the plugin
