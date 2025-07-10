@@ -120,6 +120,82 @@ reviews:
 	}
 }
 
+func TestWithYamlFileInSubdirectory_ValidFile(t *testing.T) {
+	// Create a temporary config file
+	configContent := `language: fr-FR
+tone_instructions: friendly
+reviews:
+  profile: assertive
+  summary: false
+  walkthrough: false
+  collapse_walkthrough: false
+  haiku: false
+  path_filters: "*.go,*.js"
+  path_instructions: "Review Go files carefully"
+`
+	tempDir := t.TempDir()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+
+	if err := os.MkdirAll(tempDir+"/subdir", 0755); err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	// Change to temp directory to create the config file
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
+	defer os.Chdir(cwd) // Restore original directory when done
+
+	if err := os.WriteFile("subdir/review.bitrise.yml", []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Test reading from the config file
+	settings := WithYamlFile()
+
+	// Verify settings were loaded from file
+	expectedSettings := Settings{
+		Language: "fr-FR",
+		Tone:     "friendly",
+		Reviews: Reviews{
+			Profile:             ProfileAssertive,
+			Summary:             false,
+			Walkthrough:         false,
+			CollapseWalkthrough: false,
+			Haiku:               false,
+			PathFilters:         "*.go,*.js",
+			PathInstructions:    "Review Go files carefully",
+		},
+	}
+
+	if settings.Language != expectedSettings.Language {
+		t.Errorf("Expected language %s, got %s", expectedSettings.Language, settings.Language)
+	}
+
+	if settings.Tone != expectedSettings.Tone {
+		t.Errorf("Expected tone %s, got %s", expectedSettings.Tone, settings.Tone)
+	}
+
+	if settings.Reviews.Profile != expectedSettings.Reviews.Profile {
+		t.Errorf("Expected profile %s, got %s", expectedSettings.Reviews.Profile, settings.Reviews.Profile)
+	}
+
+	if settings.Reviews.Summary != expectedSettings.Reviews.Summary {
+		t.Errorf("Expected summary %v, got %v", expectedSettings.Reviews.Summary, settings.Reviews.Summary)
+	}
+
+	if settings.Reviews.PathFilters != expectedSettings.Reviews.PathFilters {
+		t.Errorf("Expected path filters %s, got %s", expectedSettings.Reviews.PathFilters, settings.Reviews.PathFilters)
+	}
+
+	if settings.Reviews.PathInstructions != expectedSettings.Reviews.PathInstructions {
+		t.Errorf("Expected path instructions %s, got %s", expectedSettings.Reviews.PathInstructions, settings.Reviews.PathInstructions)
+	}
+}
+
 func TestWithYamlFile_PartialYam(t *testing.T) {
 	// Create temp directory for test
 	tempDir := t.TempDir()
