@@ -7,11 +7,30 @@ import (
 )
 
 const (
+	longSuggestion    = "This is a very long suggestion that should be wrapped to fit within the specified width of 50 characters. It contains multiple sentences and should be broken down into smaller lines for better readability.\n"
+	noIndentationLine = "This line has no indentation.\n"
 	spaceIndentedLine = "    This line is indented with spaces.\n"
 	tabIndentedLine   = "\t\t\tThis line is indented with a tab.\n"
 )
 
+func TestWrapString(t *testing.T) {
+	wrapped := WrapString(longSuggestion, 50)
+	expected := "This is a very long suggestion that should be\n" +
+		"wrapped to fit within the specified width of 50\n" +
+		"characters. It contains multiple sentences and\n" +
+		"should be broken down into smaller lines for\n" +
+		"better readability.\n"
+	if wrapped != expected {
+		t.Errorf("Expected wrapped string to be:\n%s\n\nGot:\n%s\n",
+			expected, wrapped)
+	}
+}
+
 func TestIndentationForLine(t *testing.T) {
+	if GetIndentation(noIndentationLine) != "" {
+		t.Error("Expected no indentation for line with no indentation")
+	}
+
 	if GetIndentation(spaceIndentedLine) != "    " {
 		t.Error("Expected space indentation for line with spaces")
 	}
