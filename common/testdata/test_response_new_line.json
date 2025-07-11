@@ -20,9 +20,9 @@
       "title": "Missing test assertions",
       "category": "test coverage",
       "issue": "The test function TestParsingResponse is empty and does not test ParseSummary or any summary parsing logic.",
-      "content": "func TestParsingResponse(t *testing.T) {\n}",
+      "content": "```func TestParsingResponse(t *testing.T) {\n}```",
       "prompt": "Implement a test case that verifies ParseSummary correctly parses a valid JSON summary and handles errors for invalid input.",
-      "suggestion": "func TestParsingResponse(t *testing.T) {\n\tjsonData := `{\"summary\":\"Test summary\",\"walkthrough\":[{\"files\":\"file.go\",\"summary\":\"Changed logic\"}],\"haiku\":\"A test haiku\"}`\n\tsummary, err := ParseSummary(jsonData)\n\tif err != nil {\n\t\tt.Fatalf(\"expected no error, got %v\", err)\n\t}\n\tif summary.Summary != \"Test summary\" {\n\t\tt.Errorf(\"expected summary to be 'Test summary', got '%s'\", summary.Summary)\n\t}\n\tif len(summary.Walkthrough) != 1 {\n\t\tt.Errorf(\"expected 1 walkthrough entry, got %d\", len(summary.Walkthrough))\n\t}\n\tif summary.Haiku != \"A test haiku\" {\n\t\tt.Errorf(\"expected haiku to be 'A test haiku', got '%s'\", summary.Haiku)\n\t}\n\n\t// Test invalid JSON\n\t_, err = ParseSummary(\"not a json\")\n\tif err == nil {\n\t\tt.Error(\"expected error for invalid JSON, got nil\")\n\t}\n}"
+      "suggestion": "```func TestParsingResponse(t *testing.T) {\n\tjsonData := `{\"summary\":\"Test summary\",\"walkthrough\":[{\"files\":\"file.go\",\"summary\":\"Changed logic\"}],\"haiku\":\"A test haiku\"}`\n\tsummary, err := ParseSummary(jsonData)\n\tif err != nil {\n\t\tt.Fatalf(\"expected no error, got %v\", err)\n\t}\n\tif summary.Summary != \"Test summary\" {\n\t\tt.Errorf(\"expected summary to be 'Test summary', got '%s'\", summary.Summary)\n\t}\n\tif len(summary.Walkthrough) != 1 {\n\t\tt.Errorf(\"expected 1 walkthrough entry, got %d\", len(summary.Walkthrough))\n\t}\n\tif summary.Haiku != \"A test haiku\" {\n\t\tt.Errorf(\"expected haiku to be 'A test haiku', got '%s'\", summary.Haiku)\n\t}\n\n\t// Test invalid JSON\n\t_, err = ParseSummary(\"not a json\")\n\tif err == nil {\n\t\tt.Error(\"expected error for invalid JSON, got nil\")\n\t}\n}```"
     }
   ],
   "haiku": "> Parsing made clean now
