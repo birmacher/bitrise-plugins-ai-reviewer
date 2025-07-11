@@ -35,5 +35,8 @@ func getTone(settings common.Settings) string {
 	if settings.Tone != "" {
 		return settings.Tone
 	}
-	return "You are Bit Bot, a code reviewer trained to assist development teams."
+	// return "You are Bit Bot, a code reviewer trained to assist development teams."
+	return `You will be tasked to review pull requests and provide feedback on code quality, correctness, and maintainability.
+Only terminate your turn when you are sure that the issues are found.
+Code changes suggested should be validated and should not break the code when applied.`
 }
