@@ -118,7 +118,7 @@ var summarizeCmd = &cobra.Command{
 		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt:      prompt.GetSystemPrompt(settings),
-			UserPrompt:        prompt.GetSummarizePrompt(settings),
+			UserPrompt:        prompt.GetSummarizePrompt(settings, commitHash, targetBranch),
 			Diff:              prompt.GetDiffPrompt(diff),
 			FileContents:      prompt.GetFileContentPrompt(fileContent),
 			LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),

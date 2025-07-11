@@ -64,8 +64,9 @@ type Request struct {
 
 // Response represents the response from the LLM
 type Response struct {
-	Content string
-	Error   error
+	Content   string
+	Error     error
+	ToolCalls interface{} // Generic interface to handle different tool call structures
 }
 
 // LLM defines the interface for language model prompting
