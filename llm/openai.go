@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
@@ -144,13 +147,44 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		},
 	}
 
-	// Create the completion request with the git diff tool
+	// Define the file reading tool
+	readFileTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "read_file",
+			Description: "Reads the content of a file from the repository",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "The relative path to the file within the repository",
+					},
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to read the file from. If not provided, reads from the current working directory.",
+					},
+					"startLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional starting line number (1-indexed). If provided with endLine, only returns the specified range of lines.",
+					},
+					"endLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional ending line number (1-indexed, inclusive). Must be used with startLine.",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+	}
+
+	// Create the completion request with both tools
 	chatReq := openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
 		Temperature: 0.2, // Lower temperature for more deterministic results
-		Tools:       []openai.Tool{gitDiffTool},
+		Tools:       []openai.Tool{gitDiffTool, readFileTool},
 		ToolChoice:  "auto", // Let the model decide when to use tools
 	}
 
@@ -215,7 +249,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 	// Process each tool call and add the results
 	for _, tool := range toolCalls {
-		if tool.Function.Name == "get_git_diff" {
+		switch tool.Function.Name {
+		case "get_git_diff":
 			// Handle git diff tool call
 			diffResult, err := o.processGitDiffToolCall(tool.Function.Arguments)
 
@@ -223,6 +258,24 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			content := diffResult
 			if err != nil {
 				content = fmt.Sprintf("Error executing git diff: %v", err)
+				logger.Error(content)
+			}
+
+			// Add the tool result as a message
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role:       openai.ChatMessageRoleTool,
+				Content:    content,
+				ToolCallID: tool.ID,
+			})
+
+		case "read_file":
+			// Handle file reading tool call
+			fileContent, err := o.processReadFileToolCall(tool.Function.Arguments)
+
+			// Create a tool result message
+			content := fileContent
+			if err != nil {
+				content = fmt.Sprintf("Error reading file: %v", err)
 				logger.Error(content)
 			}
 
@@ -309,4 +362,88 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 	}
 
 	return output, nil
+}
+
+// processReadFileToolCall extracts parameters and reads the specified file
+func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing read file tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Path      string `json:"path"`
+		Ref       string `json:"ref"`
+		StartLine int    `json:"startLine"`
+		EndLine   int    `json:"endLine"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Check that path is provided
+	if args.Path == "" {
+		return "", fmt.Errorf("file path must be provided")
+	}
+
+	// Sanitize the path to prevent directory traversal attacks
+	cleanPath := filepath.Clean(args.Path)
+	if strings.HasPrefix(cleanPath, "..") {
+		return "", fmt.Errorf("path cannot reference parent directories")
+	}
+
+	logger.Debugf("Reading file: %s, ref: %s, lines: %d-%d", cleanPath, args.Ref, args.StartLine, args.EndLine)
+
+	// Create a git runner (assuming working in current directory)
+	runner := git.NewDefaultRunner(".")
+
+	var content string
+	var err error
+
+	// If a git ref is specified, read from that ref using git show
+	if args.Ref != "" {
+		// Use git show to read the file content from the specified ref
+		objectPath := fmt.Sprintf("%s:%s", args.Ref, cleanPath)
+		content, err = runner.Run("git", "show", objectPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file from ref %s: %v", args.Ref, err)
+		}
+	} else {
+		// Read from the file system directly
+		contentBytes, err := os.ReadFile(cleanPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file from filesystem: %v", err)
+		}
+		content = string(contentBytes)
+	}
+
+	// If line range is specified, extract only those lines
+	if args.StartLine > 0 && args.EndLine >= args.StartLine {
+		lines := strings.Split(content, "\n")
+		totalLines := len(lines)
+
+		logger.Debugf("File has %d lines total", totalLines)
+
+		// Adjust for 0-indexing in the array
+		startIdx := args.StartLine - 1
+		endIdx := args.EndLine - 1
+
+		// Check bounds
+		if startIdx >= totalLines {
+			return "", fmt.Errorf("start line %d exceeds file length of %d lines", args.StartLine, totalLines)
+		}
+
+		if endIdx >= totalLines {
+			endIdx = totalLines - 1
+			logger.Debugf("Adjusting end line to file length: %d", endIdx+1)
+		}
+
+		// Extract the specified lines
+		selectedLines := lines[startIdx : endIdx+1]
+		content = strings.Join(selectedLines, "\n")
+		logger.Debugf("Extracted lines %d-%d (%d lines) from file", args.StartLine, endIdx+1, len(selectedLines))
+	} else {
+		logger.Debugf("Reading entire file content (%d characters)", len(content))
+	}
+
+	return content, nil
 }
