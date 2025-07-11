@@ -23,9 +23,9 @@ func ParseSummary(jsonData string) (Summary, error) {
 	summary := Summary{}
 
 	// Encode vialators as the LLM can respond with invalid JSON ( new lines and tabs)
-	jsonData = EncodeLLMKey(jsonData, "content")
-	jsonData = EncodeLLMKey(jsonData, "suggestion")
-	jsonData = EncodeLLMKey(jsonData, "haiku")
+	jsonData = EncodeLLMKey(jsonData, "content", true)
+	jsonData = EncodeLLMKey(jsonData, "suggestion", true)
+	jsonData = EncodeLLMKey(jsonData, "haiku", false)
 
 	if err := json.Unmarshal([]byte(jsonData), &summary); err != nil {
 		return summary, fmt.Errorf("failed to parse summary JSON: %v", err)

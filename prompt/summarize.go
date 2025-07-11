@@ -24,6 +24,7 @@ Guidelines:
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
 - For "nitpick", only flag truly minor, non-blocking style suggestions.
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
+- "content" and "suggestion" should be always valid code blocks, formatted with triple backticks ` + "(```)" + `.
 ` + getHaiku(settings) + `
 ---
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
