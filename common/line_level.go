@@ -41,9 +41,9 @@ func ParseLineLevelFeedback(jsonData string) (LineLevelFeedback, error) {
 	llf := LineLevelFeedback{}
 
 	// Encode vialators as the LLM can respond with invalid JSON ( new lines and tabs)
-	jsonData = EncodeLLMKey(jsonData, "content")
-	jsonData = EncodeLLMKey(jsonData, "suggestion")
-	jsonData = EncodeLLMKey(jsonData, "haiku")
+	jsonData = EncodeLLMKey(jsonData, "content", true)
+	jsonData = EncodeLLMKey(jsonData, "suggestion", true)
+	jsonData = EncodeLLMKey(jsonData, "haiku", false)
 
 	if err := json.Unmarshal([]byte(jsonData), &llf); err != nil {
 		return llf, fmt.Errorf("failed to parse LineLevelFeedback JSON: %v", err)

@@ -8,9 +8,18 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
-func EncodeLLMKey(jsonStr, key string) string {
-	// This regex finds the key and captures its string value, handling escaped quotes.
-	pattern := fmt.Sprintf(`"%s":\s*"((?:\\.|[^"\\])*)"`, key)
+func EncodeLLMKey(jsonStr, key string, isCode bool) string {
+	var pattern string
+
+	if isCode {
+		// For code blocks with triple backticks
+		// (?s) makes . match newlines as well
+		pattern = fmt.Sprintf(`"%s":\s*"(?s)\x60\x60\x60\n?(.*?)\n?\x60\x60\x60"`, key)
+	} else {
+		// Standard pattern for regular string values
+		pattern = fmt.Sprintf(`"%s":\s*"((?:\\.|[^"\\])*)"`, key)
+	}
+
 	re := regexp.MustCompile(pattern)
 
 	return re.ReplaceAllStringFunc(jsonStr, func(match string) string {
