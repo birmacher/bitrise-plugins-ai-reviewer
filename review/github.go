@@ -122,6 +122,28 @@ func (gh *GitHub) getCommentBodyWithoutHeader(comments []*github.IssueComment, h
 	return "", nil
 }
 
+func (gh *GitHub) ListComments(repoOwner, repoName string, pr int) ([]string, error) {
+	ctx, cancel := gh.CreateTimeoutContext()
+	defer cancel()
+
+	comments, err := gh.getComments(ctx, repoOwner, repoName, pr)
+	if err != nil {
+		return nil, err
+	}
+
+	var commentBodies []string
+	for _, c := range comments {
+		if c.Body != nil {
+			commentBodies = append(commentBodies, *c.Body)
+		}
+
+		// commentID := c.ID
+		// replyTo := c.InReplyTo
+		// c.GetReactions()
+	}
+	return commentBodies, nil
+}
+
 func (gh *GitHub) PostSummaryUnderReview(repoOwner, repoName string, pr int, header string) error {
 	logger.Infof("Summary under update for PR #%d in %s/%s", pr, repoOwner, repoName)
 

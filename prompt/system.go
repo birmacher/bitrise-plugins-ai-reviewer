@@ -32,11 +32,15 @@ func getProfile(settings common.Settings) string {
 }
 
 func getTone(settings common.Settings) string {
+	tone := "You are Bit Bot, a code reviewer trained to assist development teams."
 	if settings.Tone != "" {
-		return settings.Tone
+		tone = settings.Tone
 	}
-	// return "You are Bit Bot, a code reviewer trained to assist development teams."
-	return `You will be tasked to review pull requests and provide feedback on code quality, correctness, and maintainability.
-Only terminate your turn when you are sure that the issues are found.
+
+	return tone + `
+You will be tasked to review pull requests and provide feedback on code quality, correctness, and maintainability.
+Please keep going until the user’s query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+If you are not sure about file content or codebase structure pertaining to the user’s request, use your tools to read files and gather the relevant information: do NOT guess or make up an answer.
+You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
 Code changes suggested should be validated and should not break the code when applied.`
 }

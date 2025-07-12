@@ -29,6 +29,7 @@ type OpenAIModel struct {
 	modelName  string
 	maxTokens  int
 	apiTimeout int // in seconds
+	tools      Tools
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -182,6 +183,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processGitDiffToolCall(tool.Function.Arguments)
 		case "read_file":
 			result, err = o.processReadFileToolCall(tool.Function.Arguments)
+		// case "get_github_comments":
+		// result, err = o.processGitHubCommentsToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -308,7 +311,46 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{gitDiffTool, readFileTool}
+	// Define GitHub comments tool
+	// githubCommentsTool := openai.Tool{
+	// 	Type: openai.ToolTypeFunction,
+	// 	Function: &openai.FunctionDefinition{
+	// 		Name:        "get_github_comments",
+	// 		Description: "Gets comments from a GitHub pull request",
+	// 		Parameters: map[string]interface{}{
+	// 			"type": "object",
+	// 			"properties": map[string]interface{}{
+	// 				"owner": map[string]interface{}{
+	// 					"type":        "string",
+	// 					"description": "The GitHub repository owner (user or organization)",
+	// 				},
+	// 				"repo": map[string]interface{}{
+	// 					"type":        "string",
+	// 					"description": "The GitHub repository name",
+	// 				},
+	// 				"pr": map[string]interface{}{
+	// 					"type":        "integer",
+	// 					"description": "The pull request number",
+	// 				},
+	// 			},
+	// 			"required": []string{"owner", "repo", "pr"},
+	// 			"examples": []map[string]interface{}{
+	// 				{
+	// 					"owner": "birmacher",
+	// 					"repo":  "bitrise-plugins-ai-reviewer",
+	// 					"pr":    42,
+	// 				},
+	// 				{
+	// 					"owner": "birmacher",
+	// 					"repo":  "bitrise-plugins-ai-reviewer",
+	// 					"pr":    42,
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
+
+	return []openai.Tool{gitDiffTool, readFileTool} //, githubCommentsTool}
 }
 
 // processGitDiffToolCall extracts parameters and executes the git diff command
@@ -433,6 +475,84 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 
 	return content, nil
 }
+
+// processGitHubCommentsToolCall extracts parameters and fetches GitHub comments
+// func (o *OpenAIModel) processGitHubCommentsToolCall(argumentsJSON string) (string, error) {
+// 	logger.Debug("Processing GitHub comments tool call")
+
+// 	// Parse the arguments JSON
+// 	var args struct {
+// 		Owner        string `json:"owner"`
+// 		Repo         string `json:"repo"`
+// 		PR           int    `json:"pr"`
+// 		FilterHeader string `json:"filterHeader"`
+// 	}
+
+// 	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+// 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+// 	}
+
+// 	// Validate required fields
+// 	if args.Owner == "" || args.Repo == "" || args.PR <= 0 {
+// 		return "", fmt.Errorf("owner, repo, and PR number must be provided")
+// 	}
+
+// 	logger.Debugf("Fetching GitHub comments for %s/%s PR #%d", args.Owner, args.Repo, args.PR)
+
+// 	// Note: This is a simple implementation, in a real-world scenario we would need to
+// 	// set up a more advanced implementation that could directly call the GitHub API
+// 	// or integrate with the review package without creating import cycles
+
+// 	// This tool provides instructions on how to use the GitHub comments feature
+// 	if o.tools.GitProvider == nil {
+// 		errMsg := "GitProvider tool is not set, cannot fetch GitHub comments"
+// 		logger.Error(errMsg)
+// 		return "", errors.New(errMsg)
+// 	}
+
+// 	tmpCtx, cancel := o.tools.GitProvider.CreateTimeoutContext()
+// 	defer cancel()
+// 	o.tools.GitProvider.GetComments(args.Owner, args.Repo, args.PR)
+
+// 	instructions := fmt.Sprintf("To get GitHub comments, use the following code:\n\n"+
+// 		"```go\n"+
+// 		"import (\n"+
+// 		"\t\"context\"\n"+
+// 		"\t\"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review\"\n"+
+// 		")\n\n"+
+// 		"// Create a GitHub reviewer client\n"+
+// 		"githubReviewer, err := review.NewGitHub(\n"+
+// 		"\treview.WithAPIToken(\"your-github-token\"),\n"+
+// 		"\t// Add any other options you need\n"+
+// 		")\n"+
+// 		"if err != nil {\n"+
+// 		"\t// Handle error\n"+
+// 		"}\n\n"+
+// 		"// Get the GitHub client from the reviewer\n"+
+// 		"gh := githubReviewer.(*review.GitHub)\n\n"+
+// 		"// Create a context\n"+
+// 		"ctx, cancel := gh.CreateTimeoutContext() // Or use context.Background()\n"+
+// 		"defer cancel()\n\n"+
+// 		"// Get comments for the PR\n"+
+// 		"comments, err := gh.getComments(ctx, \"%s\", \"%s\", %d)\n"+
+// 		"if err != nil {\n"+
+// 		"\t// Handle error\n"+
+// 		"}\n\n"+
+// 		"// If you want to filter by header\n"+
+// 		"if filterHeader := \"%s\"; filterHeader != \"\" {\n"+
+// 		"\tcommentID, err := gh.getComment(comments, filterHeader)\n"+
+// 		"\tif err != nil {\n"+
+// 		"\t\t// Handle error\n"+
+// 		"\t}\n"+
+// 		"\t// Process the comment with ID: commentID\n"+
+// 		"}\n"+
+// 		"```\n\n"+
+// 		"This code demonstrates how to retrieve comments for the requested PR: %s/%s #%d.",
+// 		args.Owner, args.Repo, args.PR, args.FilterHeader, args.Owner, args.Repo, args.PR)
+
+// 	// Return the instructions without error since this is an instruction-only tool
+// 	return instructions, nil
+// }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
 func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage) openai.ChatCompletionRequest {

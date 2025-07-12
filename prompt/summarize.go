@@ -6,9 +6,11 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
-func GetSummarizePrompt(settings common.Settings, commitHash, destBranch string) string {
+func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commitHash, destBranch string) string {
 	return `Provide your final response with the following content:
 ## Pull Request Details
+- **Repository**: ` + repoOwner + `/` + repoName + `
+- **Pull Request**: ` + pr + `
 - **Commit Hash**: ` + commitHash + `
 - **Destination Branch**: ` + destBranch + `
 ` + getSummary(settings) + `

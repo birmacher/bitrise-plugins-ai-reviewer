@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 )
 
 const (
@@ -21,6 +22,7 @@ const (
 	ModelNameOption  OptionType = "model"
 	MaxTokensOption  OptionType = "max_tokens"
 	APITimeoutOption OptionType = "api_timeout"
+	ToolOption       OptionType = "tool"
 )
 
 // Option represents a generic configuration option for any LLM provider
@@ -53,6 +55,13 @@ func WithAPITimeout(timeout int) Option {
 	}
 }
 
+func WithTool(tool Tools) Option {
+	return Option{
+		Type:  ToolOption,
+		Value: tool,
+	}
+}
+
 // Request represents the data needed to generate a prompt for the LLM
 type Request struct {
 	SystemPrompt      string
@@ -67,6 +76,10 @@ type Response struct {
 	Content   string
 	Error     error
 	ToolCalls interface{} // Generic interface to handle different tool call structures
+}
+
+type Tools struct {
+	GitProvider *review.Reviewer
 }
 
 // LLM defines the interface for language model prompting
