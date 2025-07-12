@@ -368,10 +368,10 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("both base and head must be provided")
 	}
 
-	logger.Infof("Getting git diff between `%s` and `%s`", args.Base, args.Head)
+	logger.Infof("Getting git diff between `%s` and `%s`", args.Head, args.Base)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
-	output, err := git.GetDiff(args.Base, args.Head)
+	output, err := git.GetDiff(args.Head, args.Base)
 
 	if err != nil {
 		return "", fmt.Errorf("git diff command failed: %v", err)
