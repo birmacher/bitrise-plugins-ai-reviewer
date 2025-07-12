@@ -2,13 +2,25 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 	"github.com/sashabaranov/go-openai"
+)
+
+// Custom type for context keys to avoid string collisions
+type contextKey string
+
+const (
+	toolCallDepthKey contextKey = "toolCallDepth"
 )
 
 // OpenAIModel implements the LLM interface using OpenAI's API
@@ -17,6 +29,7 @@ type OpenAIModel struct {
 	modelName  string
 	maxTokens  int
 	apiTimeout int // in seconds
+	tools      Tools
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -67,86 +80,423 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 
 // Prompt sends a request to OpenAI and returns the response
 func (o *OpenAIModel) Prompt(req Request) Response {
-	logger.Debugf("Sending prompt to OpenAI model: %s", o.modelName)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
 
-	logger.Debug("Adding system prompt to OpenAI request")
-	logger.Debug(req.SystemPrompt)
-
+	// Prepare base messages with system and user prompts
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
 			Content: req.SystemPrompt,
 		},
+		{
+			Role:    openai.ChatMessageRoleUser,
+			Content: req.UserPrompt,
+		},
 	}
 
-	// Add user prompt
-	logger.Debug("Adding user prompt to OpenAI request")
-	logger.Debug(req.UserPrompt)
+	// Create and send the completion request
+	chatReq := o.createChatCompletionRequest(messages)
 
+	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
+		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
+	logger.Debug("System prompt: " + req.SystemPrompt)
+	logger.Debug("User prompt: " + req.UserPrompt)
+
+	resp, err := o.client.CreateChatCompletion(ctx, chatReq)
+	if err != nil {
+		return o.handleAPIError(fmt.Sprintf("failed to create chat completion: %v", err), nil)
+	}
+
+	if len(resp.Choices) == 0 {
+		return o.handleAPIError("OpenAI response contained no choices", nil)
+	}
+
+	// Check for tool calls in the response and handle them if present
+	if len(resp.Choices[0].Message.ToolCalls) > 0 {
+		logger.Debug("Tool call detected in response")
+		return o.handleToolCalls(ctx, resp, req)
+	}
+
+	// Return the standard response
+	return Response{
+		Content: resp.Choices[0].Message.Content,
+	}
+}
+
+// handleToolCalls processes any tool calls in the response and sends follow-up requests if needed
+func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompletionResponse, originalReq Request) Response {
+	// Define maximum recursion depth to prevent infinite tool call loops
+	const maxToolCallDepth = 5
+
+	// Get current recursion depth from context or start at 1
+	depth, ok := ctx.Value(toolCallDepthKey).(int)
+	if !ok {
+		depth = 1
+	}
+
+	// Check if we've exceeded maximum depth
+	if depth > maxToolCallDepth {
+		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
+		return Response{
+			Content:   resp.Choices[0].Message.Content + "\n\n[Note: Maximum tool call depth reached]",
+			ToolCalls: resp.Choices[0].Message.ToolCalls,
+		}
+	}
+
+	// Log and process all tool calls
+	toolCalls := resp.Choices[0].Message.ToolCalls
+
+	// Create initial messages with original system and user prompts
+	messages := []openai.ChatCompletionMessage{
+		{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: originalReq.SystemPrompt,
+		},
+		{
+			Role:    openai.ChatMessageRoleUser,
+			Content: originalReq.UserPrompt,
+		},
+	}
+
+	// Add the assistant's message with tool calls
 	messages = append(messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: req.UserPrompt,
+		Role:      openai.ChatMessageRoleAssistant,
+		Content:   resp.Choices[0].Message.Content,
+		ToolCalls: resp.Choices[0].Message.ToolCalls,
 	})
 
-	// Add diff if available
-	if req.Diff != "" {
-		logger.Debug("Including diff in OpenAI prompt")
-		logger.Debug(req.Diff)
-		messages = append(messages, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: req.Diff,
-		})
+	// Process each tool call and add the results
+	for _, tool := range toolCalls {
+		var result string
+		var err error
+
+		// Dispatch to appropriate tool handler
+		switch tool.Function.Name {
+		case "get_git_diff":
+			result, err = o.processGitDiffToolCall(tool.Function.Arguments)
+		case "read_file":
+			result, err = o.processReadFileToolCall(tool.Function.Arguments)
+		// case "get_github_comments":
+		// result, err = o.processGitHubCommentsToolCall(tool.Function.Arguments)
+		default:
+			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
+		}
+
+		// Add the tool response message
+		messages = append(messages, createToolResponse(tool.ID, result, err))
 	}
 
-	// Add file contents if available
-	if req.FileContents != "" {
-		logger.Debug("Including file contents in OpenAI prompt")
-		logger.Debug(req.FileContents)
-		messages = append(messages, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: req.FileContents,
-		})
+	// Create and send follow-up request with tool results
+	followUpReq := o.createChatCompletionRequest(messages)
+	logger.Debug("Sending follow-up request with tool results")
+
+	followUpResp, err := o.client.CreateChatCompletion(ctx, followUpReq)
+	if err != nil {
+		return o.handleAPIError(fmt.Sprintf("failed to create follow-up chat completion: %v", err), resp.Choices[0].Message.ToolCalls)
 	}
 
-	// // Add line-level feedback if available
-	// if req.LineLevelFeedback != "" {
-	// 	messages = append(messages, openai.ChatCompletionMessage{
-	// 		Role:    openai.ChatMessageRoleAssistant,
-	// 		Content: req.LineLevelFeedback,
-	// 	})
+	if len(followUpResp.Choices) == 0 {
+		return o.handleAPIError("follow-up OpenAI response contained no choices", resp.Choices[0].Message.ToolCalls)
+	}
+
+	// Check for additional tool calls in the follow-up response
+	if len(followUpResp.Choices[0].Message.ToolCalls) > 0 {
+		logger.Debugf("OpenAI message: %s", followUpResp.Choices[0].Message.Content)
+
+		toolCount := len(followUpResp.Choices[0].Message.ToolCalls)
+		logger.Debugf("Additional %d tool call(s) detected in follow-up response (depth: %d)", toolCount, depth)
+
+		// Create new context with incremented depth for recursion
+		newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
+		defer cancel()
+		newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
+
+		// Create modified request for recursion with context hint
+		modifiedReq := originalReq
+		modifiedReq.SystemPrompt += "\n\nThis is a continuation of a conversation with previous tool calls."
+
+		// Handle the additional tool calls recursively
+		return o.handleToolCalls(newCtx, followUpResp, modifiedReq)
+	}
+
+	// Return the final response with original tool calls info preserved
+	return Response{
+		Content:   followUpResp.Choices[0].Message.Content,
+		ToolCalls: resp.Choices[0].Message.ToolCalls,
+	}
+}
+
+// getTools returns the list of available tools
+func (o *OpenAIModel) getTools() []openai.Tool {
+	// Define the git diff tool
+	gitDiffTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_git_diff",
+			Description: "Gets the diff between two git references (commits, branches, or tags) showing code changes",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"base": map[string]interface{}{
+						"type":        "string",
+						"description": "The base commit or branch to compare from (e.g., 'main', 'HEAD~1', '2a7ebf')",
+					},
+					"head": map[string]interface{}{
+						"type":        "string",
+						"description": "The head commit or branch to compare to (e.g., 'feature-branch', 'HEAD', 'main')",
+					},
+				},
+				"required": []string{"base", "head"},
+				"examples": []map[string]interface{}{
+					{
+						"base": "main",
+						"head": "feature-branch",
+					},
+					{
+						"base": "HEAD~3",
+						"head": "HEAD",
+					},
+				},
+			},
+		},
+	}
+
+	// Define the file reading tool
+	readFileTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "read_file",
+			Description: "Reads the content of a file from the repository or filesystem",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "The relative path to the file within the repository",
+					},
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to read the file from. If not provided, reads from the current working directory.",
+					},
+					"startLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional starting line number (1-indexed). If provided with endLine, only returns the specified range of lines.",
+					},
+					"endLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional ending line number (1-indexed, inclusive). Must be used with startLine.",
+					},
+				},
+				"required": []string{"path"},
+				"examples": []map[string]interface{}{
+					{
+						"path": "main.go",
+					},
+					{
+						"path":      "cmd/root.go",
+						"startLine": 10,
+						"endLine":   20,
+					},
+					{
+						"path": "llm/openai.go",
+						"ref":  "main",
+					},
+				},
+			},
+		},
+	}
+
+	// Define GitHub comments tool
+	// githubCommentsTool := openai.Tool{
+	// 	Type: openai.ToolTypeFunction,
+	// 	Function: &openai.FunctionDefinition{
+	// 		Name:        "get_github_comments",
+	// 		Description: "Gets comments from a GitHub pull request",
+	// 		Parameters: map[string]interface{}{
+	// 			"type": "object",
+	// 			"properties": map[string]interface{}{
+	// 				"owner": map[string]interface{}{
+	// 					"type":        "string",
+	// 					"description": "The GitHub repository owner (user or organization)",
+	// 				},
+	// 				"repo": map[string]interface{}{
+	// 					"type":        "string",
+	// 					"description": "The GitHub repository name",
+	// 				},
+	// 				"pr": map[string]interface{}{
+	// 					"type":        "integer",
+	// 					"description": "The pull request number",
+	// 				},
+	// 			},
+	// 			"required": []string{"owner", "repo", "pr"},
+	// 			"examples": []map[string]interface{}{
+	// 				{
+	// 					"owner": "birmacher",
+	// 					"repo":  "bitrise-plugins-ai-reviewer",
+	// 					"pr":    42,
+	// 				},
+	// 				{
+	// 					"owner": "birmacher",
+	// 					"repo":  "bitrise-plugins-ai-reviewer",
+	// 					"pr":    42,
+	// 				},
+	// 			},
+	// 		},
+	// 	},
 	// }
 
-	// Create the completion request
-	chatReq := openai.ChatCompletionRequest{
+	return []openai.Tool{gitDiffTool, readFileTool} //, githubCommentsTool}
+}
+
+// processGitDiffToolCall extracts parameters and executes the git diff command
+func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing git diff tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Base string `json:"base"`
+		Head string `json:"head"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.Base == "" || args.Head == "" {
+		return "", fmt.Errorf("both base and head must be provided")
+	}
+
+	logger.Infof("Getting git diff between `%s` and `%s`", args.Head, args.Base)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	output, err := git.GetDiff(args.Head, args.Base)
+
+	if err != nil {
+		return "", fmt.Errorf("git diff command failed: %v", err)
+	}
+
+	if output == "" {
+		return "No changes found between the specified references.", nil
+	}
+
+	return output, nil
+}
+
+// processReadFileToolCall extracts parameters and reads the specified file
+func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing read file tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Path      string `json:"path"`
+		Ref       string `json:"ref"`
+		StartLine int    `json:"startLine"`
+		EndLine   int    `json:"endLine"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.Path == "" {
+		return "", fmt.Errorf("file path must be provided")
+	}
+
+	// Sanitize the path to prevent directory traversal attacks
+	cleanPath := filepath.Clean(args.Path)
+	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) && strings.HasPrefix(cleanPath, "/") {
+		return "", fmt.Errorf("invalid path: %s", args.Path)
+	}
+
+	// Get file content either from git or filesystem
+	var content string
+	var err error
+
+	if args.Ref != "" {
+		logger.Infof("Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
+
+		git := git.NewClient(git.NewDefaultRunner("."))
+		content, err = git.GetFileContent(args.Ref, cleanPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get file content from git: %v", err)
+		}
+	} else {
+		logger.Infof("Reading file: `%s`, lines %d to %d", args.Path, args.StartLine, args.EndLine)
+
+		contentBytes, err := os.ReadFile(cleanPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file: %v", err)
+		}
+		content = string(contentBytes)
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to read file content: %v", err)
+	}
+
+	if args.StartLine > 0 && args.EndLine >= args.StartLine {
+		lines := strings.Split(content, "\n")
+		totalLines := len(lines)
+
+		// Convert to 0-based index
+		startIdx := args.StartLine - 1
+		endIdx := args.EndLine - 1
+
+		// Validate range
+		if startIdx >= totalLines {
+			return "", fmt.Errorf("start line %d exceeds file length of %d lines", args.StartLine, totalLines)
+		}
+
+		// Adjust end line if it exceeds file length
+		if endIdx >= totalLines {
+			endIdx = totalLines - 1
+			logger.Debugf("Adjusting end line to file length: %d", endIdx+1)
+		}
+
+		// Extract specified lines
+		content = strings.Join(lines[startIdx:endIdx+1], "\n")
+		logger.Debugf("Extracted lines %d-%d (%d lines) from file", args.StartLine, endIdx+1, endIdx-startIdx+1)
+	} else {
+		logger.Debugf("Reading entire file content (%d characters)", len(content))
+	}
+
+	return content, nil
+}
+
+// createChatCompletionRequest creates a standard chat completion request with common settings
+func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage) openai.ChatCompletionRequest {
+	return openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
 		Temperature: 0.2, // Lower temperature for more deterministic results
+		Tools:       o.getTools(),
+		ToolChoice:  "auto", // Let the model decide when to use tools
 	}
+}
 
-	logger.Infof("Sending request to OpenAI with model %s, max tokens %d", o.modelName, o.maxTokens)
-
-	resp, err := o.client.CreateChatCompletion(ctx, chatReq)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to create chat completion: %v", err)
-		logger.Error(errMsg)
-		return Response{
-			Error: errors.New(errMsg),
-		}
-	}
-
-	if len(resp.Choices) == 0 {
-		errMsg := "OpenAI response contained no choices"
-		logger.Error(errMsg)
-		return Response{
-			Error: errors.New(errMsg),
-		}
-	}
-
+// handleAPIError creates a standard error response
+func (o *OpenAIModel) handleAPIError(errMsg string, toolCalls interface{}) Response {
+	logger.Error(errMsg)
 	return Response{
-		Content: resp.Choices[0].Message.Content,
+		Error:     errors.New(errMsg),
+		ToolCalls: toolCalls,
+	}
+}
+
+// createToolResponse creates a message with the tool response, handling any errors
+func createToolResponse(toolID string, content string, err error) openai.ChatCompletionMessage {
+	if err != nil {
+		// The error message is already logged in the tool-specific handler
+		content = fmt.Sprintf("Error: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		Content:    content,
+		ToolCallID: toolID,
 	}
 }
