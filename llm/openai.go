@@ -80,8 +80,6 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 
 // Prompt sends a request to OpenAI and returns the response
 func (o *OpenAIModel) Prompt(req Request) Response {
-	logger.Debugf("Sending prompt to OpenAI model: %s", o.modelName)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
 
@@ -97,14 +95,13 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 		},
 	}
 
-	// Log what we're sending
-	logger.Debug("System prompt: " + req.SystemPrompt)
-	logger.Debug("User prompt: " + req.UserPrompt)
-
 	// Create and send the completion request
 	chatReq := o.createChatCompletionRequest(messages)
+
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
+	logger.Debug("System prompt: " + req.SystemPrompt)
+	logger.Debug("User prompt: " + req.UserPrompt)
 
 	resp, err := o.client.CreateChatCompletion(ctx, chatReq)
 	if err != nil {
@@ -149,9 +146,6 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 	// Log and process all tool calls
 	toolCalls := resp.Choices[0].Message.ToolCalls
-	for _, tool := range toolCalls {
-		logger.Debugf("Tool call: %s, arguments: %s", tool.Function.Name, tool.Function.Arguments)
-	}
 
 	// Create initial messages with original system and user prompts
 	messages := []openai.ChatCompletionMessage{
@@ -208,6 +202,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 	// Check for additional tool calls in the follow-up response
 	if len(followUpResp.Choices[0].Message.ToolCalls) > 0 {
+		logger.Debugf("OpenAI message: %s", followUpResp.Choices[0].Message.Content)
+
 		toolCount := len(followUpResp.Choices[0].Message.ToolCalls)
 		logger.Debugf("Additional %d tool call(s) detected in follow-up response (depth: %d)", toolCount, depth)
 
@@ -372,19 +368,11 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("both base and head must be provided")
 	}
 
-	logger.Debugf("Executing git diff between %s and %s", args.Base, args.Head)
+	logger.Infof("Getting git diff between `%s` and `%s`", args.Base, args.Head)
 
-	// Create the diff range and arguments
-	diffRange := fmt.Sprintf("%s..%s", args.Base, args.Head)
-	diffArgs := []string{
-		"diff",
-		"--find-renames=" + git.DefaultRenameThreshold,
-		"--diff-algorithm=" + git.DefaultDiffAlgorithm,
-		diffRange,
-	}
+	git := git.NewClient(git.NewDefaultRunner("."))
+	output, err := git.GetDiff(args.Base, args.Head)
 
-	// Execute the git command using the runner
-	output, err := git.NewDefaultRunner(".").Run("git", diffArgs...)
 	if err != nil {
 		return "", fmt.Errorf("git diff command failed: %v", err)
 	}
@@ -423,18 +411,21 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 		return "", fmt.Errorf("invalid path: %s", args.Path)
 	}
 
-	logger.Debugf("Reading file: %s, ref: %s, lines: %d-%d", cleanPath, args.Ref, args.StartLine, args.EndLine)
-
 	// Get file content either from git or filesystem
 	var content string
 	var err error
 
 	if args.Ref != "" {
-		// Read from git ref
-		objectPath := fmt.Sprintf("%s:%s", args.Ref, cleanPath)
-		content, err = git.NewDefaultRunner(".").Run("git", "show", objectPath)
+		logger.Infof("Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
+
+		git := git.NewClient(git.NewDefaultRunner("."))
+		content, err = git.GetFileContent(args.Ref, cleanPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get file content from git: %v", err)
+		}
 	} else {
-		// Read from filesystem
+		logger.Infof("Reading file: `%s`, lines %d to %d", args.Path, args.StartLine, args.EndLine)
+
 		contentBytes, err := os.ReadFile(cleanPath)
 		if err != nil {
 			return "", fmt.Errorf("failed to read file: %v", err)
@@ -446,7 +437,6 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 		return "", fmt.Errorf("failed to read file content: %v", err)
 	}
 
-	// Extract line range if specified
 	if args.StartLine > 0 && args.EndLine >= args.StartLine {
 		lines := strings.Split(content, "\n")
 		totalLines := len(lines)
@@ -475,84 +465,6 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 
 	return content, nil
 }
-
-// processGitHubCommentsToolCall extracts parameters and fetches GitHub comments
-// func (o *OpenAIModel) processGitHubCommentsToolCall(argumentsJSON string) (string, error) {
-// 	logger.Debug("Processing GitHub comments tool call")
-
-// 	// Parse the arguments JSON
-// 	var args struct {
-// 		Owner        string `json:"owner"`
-// 		Repo         string `json:"repo"`
-// 		PR           int    `json:"pr"`
-// 		FilterHeader string `json:"filterHeader"`
-// 	}
-
-// 	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
-// 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
-// 	}
-
-// 	// Validate required fields
-// 	if args.Owner == "" || args.Repo == "" || args.PR <= 0 {
-// 		return "", fmt.Errorf("owner, repo, and PR number must be provided")
-// 	}
-
-// 	logger.Debugf("Fetching GitHub comments for %s/%s PR #%d", args.Owner, args.Repo, args.PR)
-
-// 	// Note: This is a simple implementation, in a real-world scenario we would need to
-// 	// set up a more advanced implementation that could directly call the GitHub API
-// 	// or integrate with the review package without creating import cycles
-
-// 	// This tool provides instructions on how to use the GitHub comments feature
-// 	if o.tools.GitProvider == nil {
-// 		errMsg := "GitProvider tool is not set, cannot fetch GitHub comments"
-// 		logger.Error(errMsg)
-// 		return "", errors.New(errMsg)
-// 	}
-
-// 	tmpCtx, cancel := o.tools.GitProvider.CreateTimeoutContext()
-// 	defer cancel()
-// 	o.tools.GitProvider.GetComments(args.Owner, args.Repo, args.PR)
-
-// 	instructions := fmt.Sprintf("To get GitHub comments, use the following code:\n\n"+
-// 		"```go\n"+
-// 		"import (\n"+
-// 		"\t\"context\"\n"+
-// 		"\t\"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review\"\n"+
-// 		")\n\n"+
-// 		"// Create a GitHub reviewer client\n"+
-// 		"githubReviewer, err := review.NewGitHub(\n"+
-// 		"\treview.WithAPIToken(\"your-github-token\"),\n"+
-// 		"\t// Add any other options you need\n"+
-// 		")\n"+
-// 		"if err != nil {\n"+
-// 		"\t// Handle error\n"+
-// 		"}\n\n"+
-// 		"// Get the GitHub client from the reviewer\n"+
-// 		"gh := githubReviewer.(*review.GitHub)\n\n"+
-// 		"// Create a context\n"+
-// 		"ctx, cancel := gh.CreateTimeoutContext() // Or use context.Background()\n"+
-// 		"defer cancel()\n\n"+
-// 		"// Get comments for the PR\n"+
-// 		"comments, err := gh.getComments(ctx, \"%s\", \"%s\", %d)\n"+
-// 		"if err != nil {\n"+
-// 		"\t// Handle error\n"+
-// 		"}\n\n"+
-// 		"// If you want to filter by header\n"+
-// 		"if filterHeader := \"%s\"; filterHeader != \"\" {\n"+
-// 		"\tcommentID, err := gh.getComment(comments, filterHeader)\n"+
-// 		"\tif err != nil {\n"+
-// 		"\t\t// Handle error\n"+
-// 		"\t}\n"+
-// 		"\t// Process the comment with ID: commentID\n"+
-// 		"}\n"+
-// 		"```\n\n"+
-// 		"This code demonstrates how to retrieve comments for the requested PR: %s/%s #%d.",
-// 		args.Owner, args.Repo, args.PR, args.FilterHeader, args.Owner, args.Repo, args.PR)
-
-// 	// Return the instructions without error since this is an instruction-only tool
-// 	return instructions, nil
-// }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
 func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage) openai.ChatCompletionRequest {

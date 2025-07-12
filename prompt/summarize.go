@@ -1,8 +1,6 @@
 package prompt
 
 import (
-	"strings"
-
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
@@ -30,9 +28,10 @@ Guidelines:
 - For "nitpick", only flag truly minor, non-blocking style suggestions.
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
 ` + getHaiku(settings) + `
----
+----
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
-` + getResponseFormat(settings)
+----
+Can you review PR ` + pr + ` on repo bitrise-io/bitrise-plugins-ai-reviewer (commit: ` + commitHash + `, branch: ` + destBranch + `)? Please fetch the diff and file contents as needed, then follow the usual review process.`
 }
 
 func getSummary(settings common.Settings) string {
@@ -59,19 +58,4 @@ Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
 Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.`
 	}
 	return ""
-}
-
-func getResponseFormat(settings common.Settings) string {
-	headers := []string{}
-	if settings.Reviews.Summary {
-		headers = append(headers, "**summary**")
-	}
-	if settings.Reviews.Walkthrough {
-		headers = append(headers, "**walkthrough**")
-	}
-	headers = append(headers, "**line-feedback**")
-	if settings.Reviews.Haiku {
-		headers = append(headers, "**haiku**")
-	}
-	return strings.Join(headers, ", ")
 }

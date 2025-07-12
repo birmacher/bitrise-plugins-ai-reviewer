@@ -119,10 +119,10 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt:      prompt.GetSystemPrompt(settings),
-			UserPrompt:        prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
-			Diff:              prompt.GetDiffPrompt(diff),
-			FileContents:      prompt.GetFileContentPrompt(fileContent),
+			SystemPrompt: prompt.GetSystemPrompt(settings),
+			UserPrompt:   prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
+			// Diff:              prompt.GetDiffPrompt(diff),
+			// FileContents:      prompt.GetFileContentPrompt(fileContent),
 			LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),
 		}
 
