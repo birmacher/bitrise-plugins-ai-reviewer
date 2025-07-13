@@ -21,6 +21,10 @@ type contextKey string
 
 const (
 	toolCallDepthKey contextKey = "toolCallDepth"
+	maxToolCallDepth int        = 5
+	ToolUseRequired  string     = "required"
+	ToolUseDAuto     string     = "auto"
+	ToolUseDisabled  string     = "none"
 )
 
 // OpenAIModel implements the LLM interface using OpenAI's API
@@ -29,7 +33,6 @@ type OpenAIModel struct {
 	modelName  string
 	maxTokens  int
 	apiTimeout int // in seconds
-	tools      Tools
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -83,7 +86,6 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
 
-	// Prepare base messages with system and user prompts
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
@@ -96,7 +98,7 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 	}
 
 	// Create and send the completion request
-	chatReq := o.createChatCompletionRequest(messages)
+	chatReq := o.createChatCompletionRequest(messages, ToolUseRequired)
 
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
@@ -126,22 +128,10 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 
 // handleToolCalls processes any tool calls in the response and sends follow-up requests if needed
 func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompletionResponse, originalReq Request) Response {
-	// Define maximum recursion depth to prevent infinite tool call loops
-	const maxToolCallDepth = 5
-
 	// Get current recursion depth from context or start at 1
 	depth, ok := ctx.Value(toolCallDepthKey).(int)
 	if !ok {
 		depth = 1
-	}
-
-	// Check if we've exceeded maximum depth
-	if depth > maxToolCallDepth {
-		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
-		return Response{
-			Content:   resp.Choices[0].Message.Content + "\n\n[Note: Maximum tool call depth reached]",
-			ToolCalls: resp.Choices[0].Message.ToolCalls,
-		}
 	}
 
 	// Log and process all tool calls
@@ -173,12 +163,12 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 		// Dispatch to appropriate tool handler
 		switch tool.Function.Name {
+		case "list_directory":
+			result, err = o.processListDirToolCall(tool.Function.Arguments)
 		case "get_git_diff":
 			result, err = o.processGitDiffToolCall(tool.Function.Arguments)
 		case "read_file":
 			result, err = o.processReadFileToolCall(tool.Function.Arguments)
-		// case "get_github_comments":
-		// result, err = o.processGitHubCommentsToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -188,7 +178,13 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	}
 
 	// Create and send follow-up request with tool results
-	followUpReq := o.createChatCompletionRequest(messages)
+	toolChoice := ToolUseDAuto
+	if depth > maxToolCallDepth {
+		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
+		toolChoice = ToolUseDisabled
+	}
+
+	followUpReq := o.createChatCompletionRequest(messages, toolChoice)
 	logger.Debug("Sending follow-up request with tool results")
 
 	followUpResp, err := o.client.CreateChatCompletion(ctx, followUpReq)
@@ -229,6 +225,31 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 // getTools returns the list of available tools
 func (o *OpenAIModel) getTools() []openai.Tool {
+	// List directory
+	ListDirTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "list_directory",
+			Description: "Lists all the files inside the git repository",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to list the directory from. If not provided, reads from the current working directory.",
+					},
+				},
+				"required": []string{},
+				"examples": []map[string]interface{}{
+					{},
+					{
+						"ref": "HEAD",
+					},
+				},
+			},
+		},
+	}
+
 	// Define the git diff tool
 	gitDiffTool := openai.Tool{
 		Type: openai.ToolTypeFunction,
@@ -307,46 +328,39 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	// Define GitHub comments tool
-	// githubCommentsTool := openai.Tool{
-	// 	Type: openai.ToolTypeFunction,
-	// 	Function: &openai.FunctionDefinition{
-	// 		Name:        "get_github_comments",
-	// 		Description: "Gets comments from a GitHub pull request",
-	// 		Parameters: map[string]interface{}{
-	// 			"type": "object",
-	// 			"properties": map[string]interface{}{
-	// 				"owner": map[string]interface{}{
-	// 					"type":        "string",
-	// 					"description": "The GitHub repository owner (user or organization)",
-	// 				},
-	// 				"repo": map[string]interface{}{
-	// 					"type":        "string",
-	// 					"description": "The GitHub repository name",
-	// 				},
-	// 				"pr": map[string]interface{}{
-	// 					"type":        "integer",
-	// 					"description": "The pull request number",
-	// 				},
-	// 			},
-	// 			"required": []string{"owner", "repo", "pr"},
-	// 			"examples": []map[string]interface{}{
-	// 				{
-	// 					"owner": "birmacher",
-	// 					"repo":  "bitrise-plugins-ai-reviewer",
-	// 					"pr":    42,
-	// 				},
-	// 				{
-	// 					"owner": "birmacher",
-	// 					"repo":  "bitrise-plugins-ai-reviewer",
-	// 					"pr":    42,
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// }
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool}
+}
 
-	return []openai.Tool{gitDiffTool, readFileTool} //, githubCommentsTool}
+func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing list directory tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Ref string `json:"ref,omitempty"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	if args.Ref != "" {
+		args.Ref = "HEAD"
+	}
+
+	logger.Infof("Listing directory contents at ref: %s", args.Ref)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	output, err := git.ListFiles(args.Ref)
+
+	if err != nil {
+		return "", fmt.Errorf("git ls-tree command failed: %v", err)
+	}
+
+	if output == "" {
+		return "No tracked files found.", nil
+	}
+
+	return output, nil
 }
 
 // processGitDiffToolCall extracts parameters and executes the git diff command
@@ -467,14 +481,14 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
-func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage) openai.ChatCompletionRequest {
+func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
-		Temperature: 0.2, // Lower temperature for more deterministic results
+		Temperature: 0.2,
 		Tools:       o.getTools(),
-		ToolChoice:  "auto", // Let the model decide when to use tools
+		ToolChoice:  toolChoice,
 	}
 }
 
