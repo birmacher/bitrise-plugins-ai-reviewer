@@ -1,13 +1,16 @@
 package prompt
 
 import (
-	"strings"
-
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
-func GetSummarizePrompt(settings common.Settings) string {
+func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commitHash, destBranch string) string {
 	return `Provide your final response with the following content:
+## Pull Request Details
+- **Repository**: ` + repoOwner + `/` + repoName + `
+- **Pull Request**: ` + pr + `
+- **Commit Hash**: ` + commitHash + `
+- **Destination Branch**: ` + destBranch + `
 ` + getSummary(settings) + `
 ` + getWalkthrough(settings) + `
 ## Line Feedback
@@ -26,9 +29,10 @@ Guidelines:
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
 - "content" and "suggestion" should be always valid code blocks, formatted with triple backticks ` + "(```)" + `.
 ` + getHaiku(settings) + `
----
+----
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
-` + getResponseFormat(settings)
+----
+Can you review PR ` + pr + ` on repo bitrise-io/bitrise-plugins-ai-reviewer (commit: ` + commitHash + `, branch: ` + destBranch + `)? Please fetch the diff and file contents as needed, then follow the usual review process.`
 }
 
 func getSummary(settings common.Settings) string {
@@ -55,19 +59,4 @@ Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
 Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.`
 	}
 	return ""
-}
-
-func getResponseFormat(settings common.Settings) string {
-	headers := []string{}
-	if settings.Reviews.Summary {
-		headers = append(headers, "**summary**")
-	}
-	if settings.Reviews.Walkthrough {
-		headers = append(headers, "**walkthrough**")
-	}
-	headers = append(headers, "**line-feedback**")
-	if settings.Reviews.Haiku {
-		headers = append(headers, "**haiku**")
-	}
-	return strings.Join(headers, ", ")
 }

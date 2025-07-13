@@ -108,7 +108,9 @@ var summarizeCmd = &cobra.Command{
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		llmClient, err := llm.NewLLM(provider, model)
+		llmClient, err := llm.NewLLM(provider, model, llm.WithTool(llm.Tools{
+			GitProvider: &gitProvider,
+		}))
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
 			logger.Errorf(errMsg)
@@ -117,10 +119,10 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt:      prompt.GetSystemPrompt(settings),
-			UserPrompt:        prompt.GetSummarizePrompt(settings),
-			Diff:              prompt.GetDiffPrompt(diff),
-			FileContents:      prompt.GetFileContentPrompt(fileContent),
+			SystemPrompt: prompt.GetSystemPrompt(settings),
+			UserPrompt:   prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
+			// Diff:              prompt.GetDiffPrompt(diff),
+			// FileContents:      prompt.GetFileContentPrompt(fileContent),
 			LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),
 		}
 

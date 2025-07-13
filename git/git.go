@@ -75,7 +75,6 @@ func NewClient(runner Runner) *Client {
 }
 
 func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
-
 	commitHash, err := c.GetCommitHash(commitHash)
 	if err != nil {
 		errMsg := fmt.Sprintf("error getting commit hash: %v", err)
@@ -90,6 +89,22 @@ func (c *Client) GetDiff(commitHash, targetBranch string) (string, error) {
 	}
 
 	return c.GetDiffWithParent(commitHash, false)
+}
+
+func (c *Client) ListFiles(commitHash string) (string, error) {
+	if commitHash == "" {
+		commitHash = "HEAD"
+		logger.Debug("No commit hash provided, using HEAD")
+	}
+
+	output, err := c.runner.Run("git", "ls-tree", "-r", "--name-only", commitHash)
+	if err != nil {
+		errMsg := fmt.Sprintf("error listing files for commit %s: %v", commitHash, err)
+		logger.Errorf(errMsg)
+		return "", errors.New(errMsg)
+	}
+
+	return output, nil
 }
 
 // GetFileContents retrieves the content of all files changed in the specified commit.
