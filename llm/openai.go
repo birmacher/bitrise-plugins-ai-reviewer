@@ -36,12 +36,6 @@ type OpenAIModel struct {
 	apiTimeout int // in seconds
 }
 
-type SearchResult struct {
-	File string `json:"file"`
-	Line int    `json:"line"`
-	Text string `json:"text"`
-}
-
 // NewOpenAI creates a new OpenAI client
 func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	if apiKey == "" {
