@@ -313,3 +313,25 @@ func (c *Client) getChangedFilesForCommit(commitHash, targetBranch string) ([]st
 
 	return strings.Split(diff, "\n"), nil
 }
+
+func (c *Client) Grep(commitHash, pattern string, isRegex bool, directory string) (string, error) {
+	if commitHash == "" || pattern == "" {
+		errMsg := "commit hash and pattern cannot be empty"
+		logger.Error(errMsg)
+		return "", errors.New(errMsg)
+	}
+
+	args := []string{"grep", "--no-color", "-n", "-I"}
+	if isRegex {
+		args = append(args, "-E")
+	} else {
+		args = append(args, "-F")
+	}
+	args = append(args, pattern, commitHash)
+
+	if directory != "" {
+		args = append(args, "--", directory)
+	}
+
+	return c.runner.Run("git", args...)
+}

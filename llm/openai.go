@@ -1,13 +1,11 @@
 package llm
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -541,75 +539,16 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		return "", fmt.Errorf("search query must be provided")
 	}
 
-	// Build the command
-	var cmd *exec.Cmd
-	grepArgs := []string{"-n"} // include line numbers
-
-	if args.UseRegex {
-		grepArgs = append(grepArgs, "-E")
-	}
-	grepArgs = append(grepArgs, args.Query)
-
-	// Path scoping
-	if args.Path != "" {
-		grepArgs = append(grepArgs, args.Path)
-	}
-
-	// Use git grep if ref is specified, otherwise grep
 	if args.Ref != "" {
-		gitArgs := []string{"grep", "-n"}
-		if args.UseRegex {
-			gitArgs = append(gitArgs, "-E")
-		}
-		gitArgs = append(gitArgs, args.Query, args.Ref)
-		if args.Path != "" {
-			gitArgs = append(gitArgs, "--", args.Path)
-		}
-		cmd = exec.Command("git", gitArgs...)
-	} else {
-		cmd = exec.Command("grep", grepArgs...)
+		args.Ref = "HEAD"
 	}
 
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out // optional: useful for debugging
-
-	err := cmd.Run()
-	if err != nil && out.Len() == 0 {
-		// grep returns 1 if no results found, but not an error
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-			return "no results found", nil
-		}
-		return "", fmt.Errorf("search error: %v; output: %s", err, out.String())
-	}
-
-	results := []SearchResult{}
-	for _, line := range strings.Split(out.String(), "\n") {
-		if line == "" {
-			continue
-		}
-		// Format: path/to/file:line:text
-		parts := strings.SplitN(line, ":", 3)
-		if len(parts) < 3 {
-			continue
-		}
-		file := parts[0]
-		lineNum := 0
-		fmt.Sscanf(parts[1], "%d", &lineNum)
-		text := parts[2]
-		results = append(results, SearchResult{
-			File: file,
-			Line: lineNum,
-			Text: text,
-		})
-	}
-
-	resultsJSON, err := json.Marshal(results)
+	git := git.NewClient(git.NewDefaultRunner("."))
+	content, err := git.Grep(args.Ref, args.Query, args.UseRegex, args.Path)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal search results: %v", err)
+		return "", fmt.Errorf("git grep command failed: %v", err)
 	}
-
-	return string(resultsJSON), nil
+	return content, nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
