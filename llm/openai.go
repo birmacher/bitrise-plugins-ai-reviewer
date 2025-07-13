@@ -344,7 +344,7 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	if args.Ref != "" {
+	if args.Ref == "" {
 		args.Ref = "HEAD"
 	}
 
@@ -383,10 +383,10 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("both base and head must be provided")
 	}
 
-	logger.Infof("Getting git diff between `%s` and `%s`", args.Head, args.Base)
+	logger.Infof("Getting git diff between `%s` and `%s`", args.Base, args.Head)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
-	output, err := git.GetDiff(args.Head, args.Base)
+	output, err := git.GetDiff(args.Base, args.Head)
 
 	if err != nil {
 		return "", fmt.Errorf("git diff command failed: %v", err)
