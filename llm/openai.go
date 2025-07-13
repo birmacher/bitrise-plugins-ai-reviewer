@@ -184,6 +184,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processReadFileToolCall(tool.Function.Arguments)
 		case "search_codebase":
 			result, err = o.processSearchCodebaseToolCall(tool.Function.Arguments)
+		case "get_git_blame":
+			result, err = o.processGitBlameToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -361,7 +363,48 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool}
+	// Define the git blame tool
+	gitBlameTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_git_blame",
+			Description: "Gets git blame information for a file or specific lines in a file, showing which commits last modified each line",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "The relative path to the file within the repository",
+					},
+					"startLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional starting line number (1-indexed). If provided with endLine, only returns blame for the specified range of lines.",
+					},
+					"endLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional ending line number (1-indexed, inclusive). Must be used with startLine.",
+					},
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to get blame for. If not provided, uses HEAD.",
+					},
+				},
+				"required": []string{"path"},
+				"examples": []map[string]interface{}{
+					{
+						"path": "main.go",
+					},
+					{
+						"path":      "cmd/root.go",
+						"startLine": 10,
+						"endLine":   20,
+					},
+				},
+			},
+		},
+	}
+
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -543,6 +586,46 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		return "", fmt.Errorf("git grep command failed: %v", err)
 	}
 	return content, nil
+}
+
+// processGitBlameToolCall extracts parameters and executes the git blame command
+func (o *OpenAIModel) processGitBlameToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing git blame tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Path      string `json:"path"`
+		Ref       string `json:"ref"`
+		StartLine int    `json:"startLine"`
+		EndLine   int    `json:"endLine"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.Path == "" {
+		return "", fmt.Errorf("file path must be provided")
+	}
+
+	// Sanitize the path to prevent directory traversal attacks
+	cleanPath := filepath.Clean(args.Path)
+	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) && strings.HasPrefix(cleanPath, "/") {
+		return "", fmt.Errorf("invalid path: %s", args.Path)
+	}
+
+	logger.Infof("Getting git blame for file: `%s`, lines %d to %d, ref: %s",
+		args.Path, args.StartLine, args.EndLine, args.Ref)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	output, err := git.GetBlame(args.Ref, cleanPath, args.StartLine, args.EndLine)
+
+	if err != nil {
+		return "", fmt.Errorf("git blame command failed: %v", err)
+	}
+
+	return output, nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
