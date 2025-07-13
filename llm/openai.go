@@ -528,7 +528,7 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 	var args struct {
 		Query    string `json:"query"`
 		Ref      string `json:"ref"`
-		UseRegex bool   `json:"useRegex"`
+		UseRegex bool   `json:"use_regex"`
 		Path     string `json:"path"`
 	}
 
