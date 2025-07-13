@@ -576,7 +576,7 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		return "", fmt.Errorf("search query must be provided")
 	}
 
-	if args.Ref != "" {
+	if args.Ref == "" {
 		args.Ref = "HEAD"
 	}
 
