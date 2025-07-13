@@ -260,24 +260,24 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 			Parameters: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"base": map[string]interface{}{
+					"source": map[string]interface{}{
 						"type":        "string",
-						"description": "The base commit or branch to compare from (e.g., 'main', 'HEAD~1', '2a7ebf')",
+						"description": "The source branch or commit with changes (e.g., feature branch, PR commit)",
 					},
-					"head": map[string]interface{}{
+					"target": map[string]interface{}{
 						"type":        "string",
-						"description": "The head commit or branch to compare to (e.g., 'feature-branch', 'HEAD', 'main')",
+						"description": "The target branch the changes will be merged into (e.g., 'main', 'develop')",
 					},
 				},
-				"required": []string{"base", "head"},
+				"required": []string{"source", "target"},
 				"examples": []map[string]interface{}{
 					{
-						"base": "main",
-						"head": "feature-branch",
+						"source": "5d7f7ce9c705d2f6bfcac3ae35f5bbc9ba736b5a",
+						"target": "master",
 					},
 					{
-						"base": "HEAD~3",
-						"head": "HEAD",
+						"source": "feature/branch",
+						"target": "master",
 					},
 				},
 			},
@@ -370,8 +370,8 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 
 	// Parse the arguments JSON
 	var args struct {
-		Base string `json:"base"`
-		Head string `json:"head"`
+		Target string `json:"target"`
+		Source string `json:"source"`
 	}
 
 	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
@@ -379,14 +379,14 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 	}
 
 	// Validate required fields
-	if args.Base == "" || args.Head == "" {
-		return "", fmt.Errorf("both base and head must be provided")
+	if args.Target == "" || args.Source == "" {
+		return "", fmt.Errorf("both source and target must be provided")
 	}
 
-	logger.Infof("Getting git diff between `%s` and `%s`", args.Base, args.Head)
+	logger.Infof("Getting git diff between `%s` and `%s`", args.Source, args.Target)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
-	output, err := git.GetDiff(args.Base, args.Head)
+	output, err := git.GetDiff(args.Source, args.Target)
 
 	if err != nil {
 		return "", fmt.Errorf("git diff command failed: %v", err)
