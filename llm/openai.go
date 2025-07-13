@@ -81,11 +81,7 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	return model, nil
 }
 
-// Prompt sends a request to OpenAI and returns the response
-func (o *OpenAIModel) Prompt(req Request) Response {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
-	defer cancel()
-
+func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
@@ -96,9 +92,12 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 			Content: req.UserPrompt,
 		},
 	}
+	if len(toolMessages) > 0 {
+		messages = append(messages, toolMessages...)
+	}
 
 	// Create and send the completion request
-	chatReq := o.createChatCompletionRequest(messages, ToolUseRequired)
+	chatReq := o.createChatCompletionRequest(messages, toolChoice)
 
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
@@ -126,6 +125,14 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 	}
 }
 
+// Prompt sends a request to OpenAI and returns the response
+func (o *OpenAIModel) Prompt(req Request) Response {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
+	defer cancel()
+
+	return o.promptWithContext(ctx, req, nil, ToolUseRequired)
+}
+
 // handleToolCalls processes any tool calls in the response and sends follow-up requests if needed
 func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompletionResponse, originalReq Request) Response {
 	// Get current recursion depth from context or start at 1
@@ -137,24 +144,14 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	// Log and process all tool calls
 	toolCalls := resp.Choices[0].Message.ToolCalls
 
-	// Create initial messages with original system and user prompts
+	// Add the assistant's message with tool calls
 	messages := []openai.ChatCompletionMessage{
 		{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: originalReq.SystemPrompt,
-		},
-		{
-			Role:    openai.ChatMessageRoleUser,
-			Content: originalReq.UserPrompt,
+			Role:      openai.ChatMessageRoleAssistant,
+			Content:   resp.Choices[0].Message.Content,
+			ToolCalls: resp.Choices[0].Message.ToolCalls,
 		},
 	}
-
-	// Add the assistant's message with tool calls
-	messages = append(messages, openai.ChatCompletionMessage{
-		Role:      openai.ChatMessageRoleAssistant,
-		Content:   resp.Choices[0].Message.Content,
-		ToolCalls: resp.Choices[0].Message.ToolCalls,
-	})
 
 	// Process each tool call and add the results
 	for _, tool := range toolCalls {
@@ -184,43 +181,10 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 		toolChoice = ToolUseDisabled
 	}
 
-	followUpReq := o.createChatCompletionRequest(messages, toolChoice)
-	logger.Debug("Sending follow-up request with tool results")
-
-	followUpResp, err := o.client.CreateChatCompletion(ctx, followUpReq)
-	if err != nil {
-		return o.handleAPIError(fmt.Sprintf("failed to create follow-up chat completion: %v", err), resp.Choices[0].Message.ToolCalls)
-	}
-
-	if len(followUpResp.Choices) == 0 {
-		return o.handleAPIError("follow-up OpenAI response contained no choices", resp.Choices[0].Message.ToolCalls)
-	}
-
-	// Check for additional tool calls in the follow-up response
-	if len(followUpResp.Choices[0].Message.ToolCalls) > 0 {
-		logger.Debugf("OpenAI message: %s", followUpResp.Choices[0].Message.Content)
-
-		toolCount := len(followUpResp.Choices[0].Message.ToolCalls)
-		logger.Debugf("Additional %d tool call(s) detected in follow-up response (depth: %d)", toolCount, depth)
-
-		// Create new context with incremented depth for recursion
-		newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
-		defer cancel()
-		newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
-
-		// Create modified request for recursion with context hint
-		modifiedReq := originalReq
-		modifiedReq.SystemPrompt += "\n\nThis is a continuation of a conversation with previous tool calls."
-
-		// Handle the additional tool calls recursively
-		return o.handleToolCalls(newCtx, followUpResp, modifiedReq)
-	}
-
-	// Return the final response with original tool calls info preserved
-	return Response{
-		Content:   followUpResp.Choices[0].Message.Content,
-		ToolCalls: resp.Choices[0].Message.ToolCalls,
-	}
+	newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
+	defer cancel()
+	newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
+	return o.promptWithContext(newCtx, originalReq, messages, toolChoice)
 }
 
 // getTools returns the list of available tools
