@@ -184,7 +184,20 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
 	newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
-	return o.promptWithContext(newCtx, originalReq, messages, toolChoice)
+
+	// Get response from the next recursive prompt
+	nextResponse := o.promptWithContext(newCtx, originalReq, messages, toolChoice)
+
+	// If there was an error in the next call, return it directly
+	if nextResponse.Error != nil {
+		return nextResponse
+	}
+
+	// Return the combined response including all tool calls
+	return Response{
+		Content:   nextResponse.Content,
+		ToolCalls: resp.Choices[0].Message.ToolCalls,
+	}
 }
 
 // getTools returns the list of available tools
