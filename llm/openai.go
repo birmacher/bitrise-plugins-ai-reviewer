@@ -21,6 +21,7 @@ type contextKey string
 
 const (
 	toolCallDepthKey contextKey = "toolCallDepth"
+	messagesKey      contextKey = "messages"
 	maxToolCallDepth int        = 5
 	ToolUseRequired  string     = "required"
 	ToolUseDAuto     string     = "auto"
@@ -82,6 +83,7 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 }
 
 func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
+	// Create base messages with system and user prompts
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
@@ -92,6 +94,8 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 			Content: req.UserPrompt,
 		},
 	}
+
+	// Add any tool messages from previous calls to maintain context
 	if len(toolMessages) > 0 {
 		messages = append(messages, toolMessages...)
 	}
@@ -127,8 +131,13 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 
 // Prompt sends a request to OpenAI and returns the response
 func (o *OpenAIModel) Prompt(req Request) Response {
+	// Create context with timeout and initialize it with empty message history
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
+
+	// Initialize with empty message history and depth 1
+	ctx = context.WithValue(ctx, messagesKey, []openai.ChatCompletionMessage{})
+	ctx = context.WithValue(ctx, toolCallDepthKey, 1)
 
 	return o.promptWithContext(ctx, req, nil, ToolUseRequired)
 }
@@ -141,11 +150,18 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 		depth = 1
 	}
 
+	// Get existing message history from context if available
+	var existingMessages []openai.ChatCompletionMessage
+	if ctxMessages, ok := ctx.Value(messagesKey).([]openai.ChatCompletionMessage); ok && len(ctxMessages) > 0 {
+		existingMessages = ctxMessages
+		logger.Debugf("Retrieved %d existing messages from context", len(existingMessages))
+	}
+
 	// Log and process all tool calls
 	toolCalls := resp.Choices[0].Message.ToolCalls
 
-	// Add the assistant's message with tool calls
-	messages := []openai.ChatCompletionMessage{
+	// First, collect all new messages from this tool call sequence
+	newMessages := []openai.ChatCompletionMessage{
 		{
 			Role:      openai.ChatMessageRoleAssistant,
 			Content:   resp.Choices[0].Message.Content,
@@ -171,8 +187,11 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 		}
 
 		// Add the tool response message
-		messages = append(messages, createToolResponse(tool.ID, result, err))
+		newMessages = append(newMessages, createToolResponse(tool.ID, result, err))
 	}
+
+	// Combine existing messages with new ones to maintain full conversation history
+	allMessages := append(existingMessages, newMessages...)
 
 	// Create and send follow-up request with tool results
 	toolChoice := ToolUseDAuto
@@ -181,19 +200,24 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 		toolChoice = ToolUseDisabled
 	}
 
+	// Create new context with incremented depth and message history
 	newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
 	newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
+	newCtx = context.WithValue(newCtx, messagesKey, allMessages)
 
-	// Get response from the next recursive prompt
-	nextResponse := o.promptWithContext(newCtx, originalReq, messages, toolChoice)
+	// Log conversation state for debugging
+	logger.Debugf("Sending next prompt with %d total accumulated messages at depth %d", len(allMessages), depth+1)
+
+	// Get response from the next recursive prompt with full conversation history
+	nextResponse := o.promptWithContext(newCtx, originalReq, allMessages, toolChoice)
 
 	// If there was an error in the next call, return it directly
 	if nextResponse.Error != nil {
 		return nextResponse
 	}
 
-	// Return the combined response including all tool calls
+	// Return the combined response including all tool calls and history
 	return Response{
 		Content:   nextResponse.Content,
 		ToolCalls: resp.Choices[0].Message.ToolCalls,
