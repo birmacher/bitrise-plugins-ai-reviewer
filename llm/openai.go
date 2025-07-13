@@ -1,11 +1,13 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,6 +36,12 @@ type OpenAIModel struct {
 	modelName  string
 	maxTokens  int
 	apiTimeout int // in seconds
+}
+
+type SearchResult struct {
+	File string `json:"file"`
+	Line int    `json:"line"`
+	Text string `json:"text"`
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -182,6 +190,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processGitDiffToolCall(tool.Function.Arguments)
 		case "read_file":
 			result, err = o.processReadFileToolCall(tool.Function.Arguments)
+		case "search_codebase":
+			result, err = o.processSearchCodebaseToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -329,7 +339,37 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool}
+	searchCodebaseTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "search_codebase",
+			Description: "Searches for a string or regex pattern in the codebase. Returns file paths and line numbers where the pattern matches.",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "The string or regex pattern to search for.",
+					},
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to search in. Defaults to current working directory.",
+					},
+					"use_regex": map[string]interface{}{
+						"type":        "boolean",
+						"description": "If true, treats the query as a regex pattern.",
+					},
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional: Restrict search to files under this directory path.",
+					},
+				},
+				"required": []string{"query"},
+			},
+		},
+	}
+
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -479,6 +519,97 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 	}
 
 	return content, nil
+}
+
+func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing search codebase tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Query    string `json:"query"`
+		Ref      string `json:"ref"`
+		UseRegex bool   `json:"useRegex"`
+		Path     string `json:"path"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.Query == "" {
+		return "", fmt.Errorf("search query must be provided")
+	}
+
+	// Build the command
+	var cmd *exec.Cmd
+	grepArgs := []string{"-n"} // include line numbers
+
+	if args.UseRegex {
+		grepArgs = append(grepArgs, "-E")
+	}
+	grepArgs = append(grepArgs, args.Query)
+
+	// Path scoping
+	if args.Path != "" {
+		grepArgs = append(grepArgs, args.Path)
+	}
+
+	// Use git grep if ref is specified, otherwise grep
+	if args.Ref != "" {
+		gitArgs := []string{"grep", "-n"}
+		if args.UseRegex {
+			gitArgs = append(gitArgs, "-E")
+		}
+		gitArgs = append(gitArgs, args.Query, args.Ref)
+		if args.Path != "" {
+			gitArgs = append(gitArgs, "--", args.Path)
+		}
+		cmd = exec.Command("git", gitArgs...)
+	} else {
+		cmd = exec.Command("grep", grepArgs...)
+	}
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out // optional: useful for debugging
+
+	err := cmd.Run()
+	if err != nil && out.Len() == 0 {
+		// grep returns 1 if no results found, but not an error
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return "no results found", nil
+		}
+		return "", fmt.Errorf("search error: %v; output: %s", err, out.String())
+	}
+
+	results := []SearchResult{}
+	for _, line := range strings.Split(out.String(), "\n") {
+		if line == "" {
+			continue
+		}
+		// Format: path/to/file:line:text
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		file := parts[0]
+		lineNum := 0
+		fmt.Sscanf(parts[1], "%d", &lineNum)
+		text := parts[2]
+		results = append(results, SearchResult{
+			File: file,
+			Line: lineNum,
+			Text: text,
+		})
+	}
+
+	resultsJSON, err := json.Marshal(results)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal search results: %v", err)
+	}
+
+	return string(resultsJSON), nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
