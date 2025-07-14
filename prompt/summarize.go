@@ -38,25 +38,26 @@ Can you review PR ` + pr + ` on repo bitrise-io/bitrise-plugins-ai-reviewer (com
 func getSummary(settings common.Settings) string {
 	if settings.Reviews.Summary {
 		return `## Summary
-A high-level, to-the-point, short summary of the overall change instead of specific files within 80 words.`
+Use the post_summary tool to provide a summary of the changes in the pull request.
+Include summary, walkthrough, and haiku if applicable.`
 	}
 	return ""
 }
 
 func getWalkthrough(settings common.Settings) string {
-	if settings.Reviews.Walkthrough {
-		return `## Walkthrough
-A markdown table of file(s) (multiple files should be a string, separated with commas) and their summaries. Group files 
-with similar changes together into a single row to save space. Return the file name(s) ("files") and a brief summary of the changes ("summary") in each row.`
-	}
+	// 	if settings.Reviews.Walkthrough {
+	// 		return `## Walkthrough
+	// A markdown table of file(s) (multiple files should be a string, separated with commas) and their summaries. Group files
+	// with similar changes together into a single row to save space. Return the file name(s) ("files") and a brief summary of the changes ("summary") in each row.`
+	// 	}
 	return ""
 }
 
 func getHaiku(settings common.Settings) string {
-	if settings.Reviews.Haiku {
-		return `## Haiku
-Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
-Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.`
-	}
+	// 	if settings.Reviews.Haiku {
+	// 		return `## Haiku
+	// Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
+	// Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.`
+	// 	}
 	return ""
 }
