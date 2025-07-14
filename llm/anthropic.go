@@ -21,6 +21,7 @@ type AnthropicModel struct {
 	maxTokens   int
 	apiTimeout  int // in seconds
 	GitProvider *review.Reviewer
+	Settings    *common.Settings
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -73,6 +74,10 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 
 func (a *AnthropicModel) SetGitProvider(gitProvider *review.Reviewer) {
 	a.GitProvider = gitProvider
+}
+
+func (a *AnthropicModel) SetSettings(settings *common.Settings) {
+	a.Settings = settings
 }
 
 // Prompt sends a request to Anthropic and returns the response

@@ -22,7 +22,7 @@ type contextKey string
 const (
 	toolCallDepthKey contextKey = "toolCallDepth"
 	messagesKey      contextKey = "messages"
-	maxToolCallDepth int        = 5
+	maxToolCallDepth int        = 10
 	ToolUseRequired  string     = "required"
 	ToolUseDAuto     string     = "auto"
 	ToolUseDisabled  string     = "none"
@@ -35,6 +35,7 @@ type OpenAIModel struct {
 	maxTokens   int
 	apiTimeout  int // in seconds
 	GitProvider *review.Reviewer
+	Settings    *common.Settings
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -85,6 +86,10 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 
 func (o *OpenAIModel) SetGitProvider(gitProvider *review.Reviewer) {
 	o.GitProvider = gitProvider
+}
+
+func (o *OpenAIModel) SetSettings(settings *common.Settings) {
+	o.Settings = settings
 }
 
 func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
@@ -193,6 +198,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processGitBlameToolCall(tool.Function.Arguments)
 		case "get_pull_request_details":
 			result, err = o.processGetPullRequestDetailsToolCall(tool.Function.Arguments)
+		case "post_summary":
+			result, err = o.processPostSummaryToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -449,7 +456,55 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool}
+	postSummaryTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "post_summary",
+			Description: "Posts a summary of the code changes under review",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"repo_owner": map[string]interface{}{
+						"type":        "string",
+						"description": "The owner of the repository (e.g., 'bitrise-io')",
+					},
+					"repo_name": map[string]interface{}{
+						"type":        "string",
+						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
+					},
+					"pr_number": map[string]interface{}{
+						"type":        "integer",
+						"description": "The pull request number to retrieve details for",
+					},
+					"summary": map[string]interface{}{
+						"type":        "string",
+						"description": "A high-level, to-the-point, short summary of the overall change instead of specific files within 80 words.",
+					},
+					"walkthrough": map[string]interface{}{
+						"type":        "integer",
+						"description": "Files that changed and the change summary separated by ':'. Group files with similar changes together to save space. Separate lines by \n.",
+					},
+					"haiku": map[string]interface{}{
+						"type":        "string",
+						"description": "A whimsical, short haiku to celebrate the changes as 'Bit Bot'. Format the haiku as a quote using the '>' symbol and feel free to use emojis where relevant.",
+					},
+				},
+				"required": []string{"repo_owner", "repo_name", "pr_number", "summary", "walkthrough", "haiku"},
+				"examples": []map[string]interface{}{
+					{
+						"repo_owner":  "bitrise-io",
+						"repo_name":   "bitrise-plugins-ai-reviewer",
+						"pr_number":   42,
+						"summary":     "This PR implements a new feature that allows users to filter search results by date.",
+						"walkthrough": "main.go: Implemented search filtering by date\ncmd/root.go: Updated CLI commands to support new filter options",
+						"haiku":       "> New tools in the breeze\n> Codebase whispers, search, blame, fetch—\n> Review magic grows 🌱🤖",
+					},
+				},
+			},
+		},
+	}
+
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -696,6 +751,75 @@ func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string)
 	}
 
 	return pullRequestDetails.String(), nil
+}
+
+func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing post summary tool call")
+	// Parse the arguments JSON
+	var args struct {
+		RepoOwner   string `json:"repo_owner"`
+		RepoName    string `json:"repo_name"`
+		PRNumber    int    `json:"pr_number"`
+		Summary     string `json:"summary"`
+		Walkthrough string `json:"walkthrough"`
+		Haiku       string `json:"haiku"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
+		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
+	}
+
+	if args.Summary == "" || args.Walkthrough == "" || args.Haiku == "" {
+		return "", fmt.Errorf("summary, walkthrough and haiku must be provided")
+	}
+
+	logger.Infof("🤖 Posting summary: %s")
+
+	if o.GitProvider == nil {
+		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
+	}
+
+	walkthrough := make([]common.Walkthrough, 0)
+	for line := range strings.SplitSeq(args.Walkthrough, "\n") {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid walkthrough format, expected 'file: change summary', got: %s", line)
+		}
+		filePath := strings.TrimSpace(parts[0])
+		changeSummary := strings.TrimSpace(parts[1])
+
+		walkthrough = append(walkthrough, common.Walkthrough{
+			Files:   filePath,
+			Summary: changeSummary,
+		})
+	}
+
+	summary := common.Summary{
+		Summary:     args.Summary,
+		Walkthrough: walkthrough,
+		Haiku:       args.Haiku,
+	}
+
+	headerStr := summary.Header()
+	summaryStr := summary.String((*o.GitProvider).GetProvider(), *o.Settings)
+
+	logger.Debugf("Posting summary")
+	logger.Debugf("Summary %s", summaryStr)
+
+	err := (*o.GitProvider).PostSummary(args.RepoOwner, args.RepoName, args.PRNumber, headerStr, summaryStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to post summary: %v", err)
+	}
+
+	return "Summary posted successfully", nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
