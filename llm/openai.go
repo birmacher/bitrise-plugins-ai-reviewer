@@ -269,7 +269,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	// Return the combined response including all tool calls and history
 	responseContent := nextResponse.Content
 	if responseContent == "" {
-		responseContent = "[request processed]"
+		responseContent = "[empty content]"
 	}
 
 	return Response{
