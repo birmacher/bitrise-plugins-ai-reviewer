@@ -773,7 +773,7 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		args.Ref = "HEAD"
 	}
 
-	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s, use regex: %t, path: %s", args.Query, args.Ref, args.Path)
+	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s", args.Query, args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	content, err := git.Grep(args.Ref, args.Query, args.UseRegex, args.Path)
