@@ -4,6 +4,6 @@ description: |-
   
   This plugin uses AI to analyze code changes and provide feedback.
 executable:
-  osx: https://github.com/bitrise-io/bitrise-plugins-ai-reviewer/releases/download/0.1.23/bitrise-plugins-ai-reviewer-Darwin-x86_64
-  osx-arm64: https://github.com/bitrise-io/bitrise-plugins-ai-reviewer/releases/download/0.1.23/bitrise-plugins-ai-reviewer-Darwin-arm64
-  linux: https://github.com/bitrise-io/bitrise-plugins-ai-reviewer/releases/download/0.1.23/bitrise-plugins-ai-reviewer-Linux-x86_64
+  osx: https://github.com/bitrise-io/bitrise-plugins-ai-reviewer/releases/download/0.1.24/bitrise-plugins-ai-reviewer-Darwin-x86_64
+  osx-arm64: https://github.com/bitrise-io/bitrise-plugins-ai-reviewer/releases/download/0.1.24/bitrise-plugins-ai-reviewer-Darwin-arm64
+  linux: https://github.com/bitrise-io/bitrise-plugins-ai-reviewer/releases/download/0.1.24/bitrise-plugins-ai-reviewer-Linux-x86_64
