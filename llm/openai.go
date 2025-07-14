@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -423,7 +422,7 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 		args.Ref = "HEAD"
 	}
 
-	logger.Infof("Listing directory contents at ref: %s", args.Ref)
+	logger.Infof("🤖 Listing git directory contents at ref: %s", args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	output, err := git.ListFiles(args.Ref)
@@ -458,7 +457,7 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("both source and target must be provided")
 	}
 
-	logger.Infof("Getting git diff between `%s` and `%s`", args.Source, args.Target)
+	logger.Infof("🤖 Getting git diff between `%s` and `%s`", args.Source, args.Target)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	output, err := git.GetDiff(args.Source, args.Target)
@@ -506,25 +505,15 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 	var err error
 
 	if args.Ref != "" {
-		logger.Infof("Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
-
-		git := git.NewClient(git.NewDefaultRunner("."))
-		content, err = git.GetFileContent(args.Ref, cleanPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to get file content from git: %v", err)
-		}
-	} else {
-		logger.Infof("Reading file: `%s`, lines %d to %d", args.Path, args.StartLine, args.EndLine)
-
-		contentBytes, err := os.ReadFile(cleanPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to read file: %v", err)
-		}
-		content = string(contentBytes)
+		args.Ref = "HEAD"
 	}
 
+	logger.Infof("🤖 Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	content, err = git.GetFileContent(args.Ref, cleanPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file content: %v", err)
+		return "", fmt.Errorf("failed to get file content from git: %v", err)
 	}
 
 	if args.StartLine > 0 && args.EndLine >= args.StartLine {
@@ -580,6 +569,8 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		args.Ref = "HEAD"
 	}
 
+	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s, use regex: %t, path: %s", args.Query, args.Ref, args.Path)
+
 	git := git.NewClient(git.NewDefaultRunner("."))
 	content, err := git.Grep(args.Ref, args.Query, args.UseRegex, args.Path)
 	if err != nil {
@@ -615,7 +606,7 @@ func (o *OpenAIModel) processGitBlameToolCall(argumentsJSON string) (string, err
 		return "", fmt.Errorf("invalid path: %s", args.Path)
 	}
 
-	logger.Infof("Getting git blame for file: `%s`, lines %d to %d, ref: %s",
+	logger.Infof("🤖 Getting git blame for file: `%s`, lines %d to %d, ref: %s",
 		args.Path, args.StartLine, args.EndLine, args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
