@@ -20,6 +20,7 @@ import (
 type contextKey string
 
 const (
+	emptyContentKey  string     = "emptyContent"
 	toolCallDepthKey contextKey = "toolCallDepth"
 	messagesKey      contextKey = "messages"
 	maxToolCallDepth int        = 10
@@ -150,8 +151,13 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 	}
 
 	// Return the standard response
+	responseContent := resp.Choices[0].Message.Content
+	if responseContent == "" {
+		responseContent = emptyContentKey
+	}
+
 	return Response{
-		Content: resp.Choices[0].Message.Content,
+		Content: responseContent,
 	}
 }
 
@@ -193,10 +199,16 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	toolCalls := resp.Choices[0].Message.ToolCalls
 
 	// First, collect all new messages from this tool call sequence
+	// Ensure content is never null as OpenAI API requires a string value
+	messageContent := resp.Choices[0].Message.Content
+	if messageContent == "" {
+		messageContent = emptyContentKey
+	}
+
 	newMessages := []openai.ChatCompletionMessage{
 		{
 			Role:      openai.ChatMessageRoleAssistant,
-			Content:   resp.Choices[0].Message.Content,
+			Content:   messageContent,
 			ToolCalls: resp.Choices[0].Message.ToolCalls,
 		},
 	}
@@ -256,8 +268,13 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	}
 
 	// Return the combined response including all tool calls and history
+	responseContent := nextResponse.Content
+	if responseContent == "" {
+		responseContent = emptyContentKey
+	}
+
 	return Response{
-		Content:   nextResponse.Content,
+		Content:   responseContent,
 		ToolCalls: resp.Choices[0].Message.ToolCalls,
 	}
 }
@@ -756,7 +773,7 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		args.Ref = "HEAD"
 	}
 
-	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s, use regex: %t, path: %s", args.Query, args.Ref, args.Path)
+	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s", args.Query, args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	content, err := git.Grep(args.Ref, args.Query, args.UseRegex, args.Path)
@@ -979,6 +996,10 @@ func createToolResponse(toolID string, content string, err error) openai.ChatCom
 	if err != nil {
 		// The error message is already logged in the tool-specific handler
 		content = fmt.Sprintf("Error: %v", err)
+	}
+
+	if content == "" {
+		content = emptyContentKey
 	}
 
 	return openai.ChatCompletionMessage{
