@@ -38,10 +38,13 @@ func EncodeLLMKey(jsonStr, key string, isCode bool) string {
 }
 
 func DecodeLLMValue(value string) (string, error) {
+	// First try to decode as base64
 	decodedLine, err := base64.StdEncoding.DecodeString(value)
 	if err != nil {
 		logger.Warnf("Error decoding base64 value: %v", err)
-		return "", err
+		// If not base64 encoded, return the original value as a fallback
+		// This helps with cases where the haiku is returned as plain text
+		return value, nil
 	}
 	return string(decodedLine), nil
 }
