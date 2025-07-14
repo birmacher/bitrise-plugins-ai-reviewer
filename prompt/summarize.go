@@ -16,7 +16,7 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 ## During review
 - post_line_feedback immediately after finding an issue, do not wait for the review to finish
 - post_summary at the end of the review, summarizing the changes and issues found
-- for the summary include: ` getSummary(settings) + `
+- for the summary include: ` + getSummary(settings) + `
 ## Finished
 Once line feedbacks and summary posted you should reply with a "done" message, and do not call any more tools.
 ## Guidelines
