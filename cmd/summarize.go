@@ -108,9 +108,17 @@ var summarizeCmd = &cobra.Command{
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		llmClient, err := llm.NewLLM(provider, model, llm.WithTool(llm.Tools{
-			GitProvider: &gitProvider,
-		}))
+		var llmClient llm.LLM
+		if codeReviewerName != "" {
+			// Only provide git provider if code reviewer is specified
+			llmClient, err = llm.NewLLM(provider, model, llm.WithTool(llm.Tools{
+				GitProvider: &gitProvider,
+			}))
+		} else {
+			// No git provider is available
+			llmClient, err = llm.NewLLM(provider, model)
+		}
+
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
 			logger.Errorf(errMsg)

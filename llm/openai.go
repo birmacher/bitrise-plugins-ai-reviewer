@@ -690,6 +690,11 @@ func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string)
 
 	logger.Infof("🤖 Getting pull request details for %s/%s PR #%d", args.RepoOwner, args.RepoName, args.PRNumber)
 
+	// Check if GitProvider is properly initialized
+	if o.GitProvider == nil {
+		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
+	}
+
 	// Create a new GitHub client
 	details, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
 	if err != nil {
