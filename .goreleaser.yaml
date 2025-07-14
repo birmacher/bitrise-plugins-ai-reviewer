@@ -27,7 +27,7 @@ release:
   github:
     owner: bitrise-io
     name: bitrise-plugins-ai-reviewer
-  draft: true
+  draft: false
   mode: replace
 
 checksum:
