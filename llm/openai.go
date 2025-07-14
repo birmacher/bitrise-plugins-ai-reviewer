@@ -112,7 +112,22 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 	}
 
 	// Create and send the completion request
-	chatReq := o.createChatCompletionRequest(messages, toolChoice)
+	forceSummary := false
+	depth, ok := ctx.Value(toolCallDepthKey).(int)
+	if !ok {
+		depth = 1
+	}
+	if depth == maxToolCallDepth {
+		logger.Warn("Reaching maximum tool call recursion depth, forcing summary")
+		forceSummary = true
+		toolChoice = ToolUseRequired
+	}
+	if depth > maxToolCallDepth {
+		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
+		toolChoice = ToolUseDisabled
+	}
+
+	chatReq := o.createChatCompletionRequest(messages, toolChoice, forceSummary)
 
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
@@ -223,11 +238,6 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	// Create and send follow-up request with tool results
 	toolChoice := ToolUseAuto
 
-	if depth > maxToolCallDepth {
-		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
-		toolChoice = ToolUseDisabled
-	}
-
 	// Create new context with incremented depth and message history
 	newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
 	defer cancel()
@@ -253,7 +263,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 }
 
 // getTools returns the list of available tools
-func (o *OpenAIModel) getTools() []openai.Tool {
+func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 	// List directory
 	ListDirTool := openai.Tool{
 		Type: openai.ToolTypeFunction,
@@ -577,6 +587,9 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
+	if forceSummary {
+		return []openai.Tool{postSummaryTool}
+	}
 	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
 }
 
@@ -937,17 +950,17 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 	logger.Debugf("line feedback added to queue for file: %s", lineFeedback.File)
 	o.LineFeedback = append(o.LineFeedback, lineFeedback)
 
-	return "Line feedback processed successfully", nil
+	return fmt.Sprintf("Line feedback processed successfully for file %s", lineFeedback.File), nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
-func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string) openai.ChatCompletionRequest {
+func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string, forceSummary bool) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
 		Temperature: 0.2,
-		Tools:       o.getTools(),
+		Tools:       o.getTools(forceSummary),
 		ToolChoice:  toolChoice,
 	}
 }
