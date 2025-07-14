@@ -998,7 +998,7 @@ func createToolResponse(toolID string, content string, err error) openai.ChatCom
 	}
 
 	if content == "" {
-		content = "[Empty content]"
+		content = "[empty content]"
 	}
 
 	return openai.ChatCompletionMessage{
