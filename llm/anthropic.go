@@ -20,7 +20,7 @@ type AnthropicModel struct {
 	modelName   string
 	maxTokens   int
 	apiTimeout  int // in seconds
-	GitProvider review.Reviewer
+	GitProvider *review.Reviewer
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -65,21 +65,14 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 			if timeout, ok := opt.Value.(int); ok {
 				model.apiTimeout = timeout
 			}
-		case ToolOption:
-			if tools, ok := opt.Value.(Tools); ok {
-				model.GitProvider = tools.GitProvider
-				if model.GitProvider != nil {
-					logger.Debugf("Anthropic client configured with Git provider: %s", (model.GitProvider).GetProvider())
-				}
-			} else {
-				errMsg := "tool option must be of type Tools"
-				logger.Error(errMsg)
-				return nil, errors.New(errMsg)
-			}
 		}
 	}
 
 	return model, nil
+}
+
+func (a *AnthropicModel) SetGitProvider(gitProvider *review.Reviewer) {
+	a.GitProvider = gitProvider
 }
 
 // Prompt sends a request to Anthropic and returns the response

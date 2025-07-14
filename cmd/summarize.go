@@ -96,33 +96,27 @@ var summarizeCmd = &cobra.Command{
 			return errors.New(errMsg)
 		}
 
-		// Get existing review comments
-		lineLevelFeedback, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
-		if err != nil {
-			errMsg := fmt.Sprintf("Error getting existing review comments: %v", err)
-			logger.Errorf(errMsg)
-			return errors.New(errMsg)
-		}
+		// // Get existing review comments
+		// lineLevelFeedback, err := gitProvider.GetReviewRequestComments(repoOwner, repoName, pr)
+		// if err != nil {
+		// 	errMsg := fmt.Sprintf("Error getting existing review comments: %v", err)
+		// 	logger.Errorf(errMsg)
+		// 	return errors.New(errMsg)
+		// }
 
 		// Setup LLM client
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		var llmClient llm.LLM
-		if codeReviewerName != "" {
-			// Only provide git provider if code reviewer is specified
-			llmClient, err = llm.NewLLM(provider, model, llm.WithTool(llm.Tools{
-				GitProvider: gitProvider,
-			}))
-		} else {
-			// No git provider is available
-			llmClient, err = llm.NewLLM(provider, model)
-		}
-
+		llmClient, err := llm.NewLLM(provider, model)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
 			logger.Errorf(errMsg)
 			return errors.New(errMsg)
+		}
+
+		if gitProvider != nil {
+			llmClient.SetGitProvider(&gitProvider)
 		}
 
 		// Setup the prompt
@@ -131,7 +125,7 @@ var summarizeCmd = &cobra.Command{
 			UserPrompt:   prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
 			// Diff:              prompt.GetDiffPrompt(diff),
 			// FileContents:      prompt.GetFileContentPrompt(fileContent),
-			LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),
+			// LineLevelFeedback: prompt.GetLineLevelFeedbackPrompt(lineLevelFeedback),
 		}
 
 		// Send the prompt and get the response

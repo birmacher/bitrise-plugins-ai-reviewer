@@ -22,7 +22,6 @@ const (
 	ModelNameOption  OptionType = "model"
 	MaxTokensOption  OptionType = "max_tokens"
 	APITimeoutOption OptionType = "api_timeout"
-	ToolOption       OptionType = "tool"
 )
 
 // Option represents a generic configuration option for any LLM provider
@@ -55,13 +54,6 @@ func WithAPITimeout(timeout int) Option {
 	}
 }
 
-func WithTool(tool Tools) Option {
-	return Option{
-		Type:  ToolOption,
-		Value: tool,
-	}
-}
-
 // Request represents the data needed to generate a prompt for the LLM
 type Request struct {
 	SystemPrompt      string
@@ -86,6 +78,7 @@ type Tools struct {
 type LLM interface {
 	// Prompt sends a request to the language model and returns its response
 	Prompt(req Request) Response
+	SetGitProvider(gitProvider *review.Reviewer)
 }
 
 func getAPIKey() (string, error) {

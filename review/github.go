@@ -107,13 +107,10 @@ func (gh *GitHub) GetPullRequestDetails(repoOwner, repoName string, pr int) (com
 		return common.PullRequest{}, errors.New(errMsg)
 	}
 
-	title := prDetails.Title
-	description := prDetails.Body
-	owner := prDetails.User.GetName()
-	createdAt := prDetails.CreatedAt.Format("2006-01-02 15:04:05")
-	updatedAt := prDetails.UpdatedAt.Format("2006-01-02 15:04:05")
-	merged := prDetails.Merged
-	mergeable := prDetails.Mergeable
+	owner := ""
+	if prDetails.GetUser() != nil {
+		owner = prDetails.GetUser().GetName()
+	}
 
 	labels := make([]common.Label, 0)
 	for _, label := range prDetails.Labels {
@@ -140,15 +137,15 @@ func (gh *GitHub) GetPullRequestDetails(repoOwner, repoName string, pr int) (com
 
 	return common.PullRequest{
 		Number:     pr,
-		Title:      *title,
-		Body:       *description,
+		Title:      prDetails.GetTitle(),
+		Body:       prDetails.GetBody(),
 		HeadBranch: prDetails.Head.GetRef(),
 		BaseBranch: prDetails.Base.GetRef(),
-		CreatedAt:  createdAt,
-		UpdatedAt:  updatedAt,
+		CreatedAt:  prDetails.GetCreatedAt().String(),
+		UpdatedAt:  prDetails.GetUpdatedAt().String(),
 		Author:     owner,
-		Mergeable:  mergeable != nil && *mergeable,
-		Merged:     *merged,
+		Mergeable:  prDetails.GetMergeable(),
+		Merged:     prDetails.GetMerged(),
 		Labels:     labels,
 		Commits:    commits,
 	}, nil

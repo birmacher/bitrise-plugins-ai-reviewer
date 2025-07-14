@@ -34,7 +34,7 @@ type OpenAIModel struct {
 	modelName   string
 	maxTokens   int
 	apiTimeout  int // in seconds
-	GitProvider review.Reviewer
+	GitProvider *review.Reviewer
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -77,21 +77,14 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 			if timeout, ok := opt.Value.(int); ok {
 				model.apiTimeout = timeout
 			}
-		case ToolOption:
-			if tools, ok := opt.Value.(Tools); ok {
-				model.GitProvider = tools.GitProvider
-				if model.GitProvider != nil {
-					logger.Debugf("OpenAI client configured with Git provider: %s", (model.GitProvider).GetProvider())
-				}
-			} else {
-				errMsg := "tool option must be of type Tools"
-				logger.Error(errMsg)
-				return nil, errors.New(errMsg)
-			}
 		}
 	}
 
 	return model, nil
+}
+
+func (o *OpenAIModel) SetGitProvider(gitProvider *review.Reviewer) {
+	o.GitProvider = gitProvider
 }
 
 func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
@@ -695,15 +688,23 @@ func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string)
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
 	}
 
-	// Create a new GitHub client
-	details, err := (o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
-	if err != nil {
-		return "", fmt.Errorf("failed to get PR details: %v", err)
+	var pullRequestDetails common.PullRequest
+	if o.GitProvider == nil {
+		return "", fmt.Errorf("git provider is not set, cannot fetch PR details")
+	} else {
+		// Create a new GitHub client
+		fmt.Println("Fetching pull request details...")
+		details, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
+		fmt.Println(details)
+		if err != nil {
+			return "", fmt.Errorf("failed to get PR details: %v", err)
+		}
+		pullRequestDetails = details
 	}
 
-	logger.Debug(details.String())
+	logger.Debug(pullRequestDetails.String())
 
-	return details.String(), nil
+	return pullRequestDetails.String(), nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
