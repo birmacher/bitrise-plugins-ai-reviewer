@@ -49,11 +49,8 @@ func getSummary(settings common.Settings) string {
 			include = append(include, "haiku")
 		}
 
-		return `## Summary
-Use the post_summary tool to provide a summary of the changes in the pull request.
-Include ` + strings.Join(include, ", ") + `, the remaining parameters (if any) should be an empty string.`
+		return `Use the post_summary tool to provide a summary of the changes in the pull request. Include ` + strings.Join(include, ", ") + `.`
 	}
 
-	return `## Summary
-Skip sending summary, no need to use the post_summary tool.`
+	return `Skip sending summary, no need to use the post_summary tool.`
 }
