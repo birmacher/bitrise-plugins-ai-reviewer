@@ -170,6 +170,7 @@ func ProcessLineFeedbackItems(
 // Reviewer defines the interface for code review interactions
 type Reviewer interface {
 	GetProvider() string
+	GetPullRequestDetails(repoOwner, repoName string, pr int) (common.PullRequest, error)
 	SupportCollapsibleMarkdown() bool
 	// ListComments(repoOwner, repoName string, pr int) ([]string, error)
 	PostSummaryUnderReview(repoOwner, repoName string, pr int, header string) error

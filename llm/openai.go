@@ -12,6 +12,7 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -29,10 +30,11 @@ const (
 
 // OpenAIModel implements the LLM interface using OpenAI's API
 type OpenAIModel struct {
-	client     *openai.Client
-	modelName  string
-	maxTokens  int
-	apiTimeout int // in seconds
+	client      *openai.Client
+	modelName   string
+	maxTokens   int
+	apiTimeout  int // in seconds
+	GitProvider *review.Reviewer
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -74,6 +76,15 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 		case APITimeoutOption:
 			if timeout, ok := opt.Value.(int); ok {
 				model.apiTimeout = timeout
+			}
+		case ToolOption:
+			if gitProvider, ok := opt.Value.(review.Reviewer); ok {
+				model.GitProvider = &gitProvider
+				logger.Debugf("OpenAI client configured with Git provider: %s", gitProvider.GetProvider())
+			} else {
+				errMsg := "tool option must be of type *review.Reviewer"
+				logger.Error(errMsg)
+				return nil, errors.New(errMsg)
 			}
 		}
 	}
@@ -185,6 +196,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processSearchCodebaseToolCall(tool.Function.Arguments)
 		case "get_git_blame":
 			result, err = o.processGitBlameToolCall(tool.Function.Arguments)
+		case "get_pull_request_details":
+			result, err = o.processGetPullRequestDetailsToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -403,7 +416,45 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool}
+	getPullRequestDetailsTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_pull_request_details",
+			Description: "Retrieves details about a pull request, including its title, description, author, and status",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"repo_owner": map[string]interface{}{
+						"type":        "string",
+						"description": "The owner of the repository (e.g., 'bitrise-io')",
+					},
+					"repo_name": map[string]interface{}{
+						"type":        "string",
+						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
+					},
+					"pr_number": map[string]interface{}{
+						"type":        "integer",
+						"description": "The pull request number to retrieve details for",
+					},
+				},
+				"required": []string{"repo_owner", "repo_name", "pr_number"},
+				"examples": []map[string]interface{}{
+					{
+						"repo_owner": "bitrise-io",
+						"repo_name":  "bitrise-plugins-ai-reviewer",
+						"pr_number":  42,
+					},
+					{
+						"repo_owner": "bitrise-io",
+						"repo_name":  "bitrise-plugins-ai-reviewer",
+						"pr_number":  100,
+					},
+				},
+			},
+		},
+	}
+
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -617,6 +668,35 @@ func (o *OpenAIModel) processGitBlameToolCall(argumentsJSON string) (string, err
 	}
 
 	return output, nil
+}
+
+func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing get pull request details tool call")
+	// Parse the arguments JSON
+	var args struct {
+		RepoOwner string `json:"repo_owner"`
+		RepoName  string `json:"repo_name"`
+		PRNumber  int    `json:"pr_number"`
+	}
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+	// Validate required fields
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
+		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
+	}
+
+	logger.Infof("🤖 Getting pull request details for %s/%s PR #%d", args.RepoOwner, args.RepoName, args.PRNumber)
+
+	// Create a new GitHub client
+	details, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
+	if err != nil {
+		return "", fmt.Errorf("failed to get PR details: %v", err)
+	}
+
+	logger.Debug(details.String())
+
+	return details.String(), nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings

@@ -11,14 +11,16 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 )
 
 // AnthropicModel implements the LLM interface using Anthropic's API
 type AnthropicModel struct {
-	client     anthropic.Client
-	modelName  string
-	maxTokens  int
-	apiTimeout int // in seconds
+	client      anthropic.Client
+	modelName   string
+	maxTokens   int
+	apiTimeout  int // in seconds
+	GitProvider *review.Reviewer
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -62,6 +64,15 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 		case APITimeoutOption:
 			if timeout, ok := opt.Value.(int); ok {
 				model.apiTimeout = timeout
+			}
+		case ToolOption:
+			if gitProvider, ok := opt.Value.(review.Reviewer); ok {
+				model.GitProvider = &gitProvider
+				logger.Debugf("Anthropic client configured with Git provider: %s", gitProvider.GetProvider())
+			} else {
+				errMsg := "Tool option must be of type *review.Reviewer"
+				logger.Error(errMsg)
+				return nil, errors.New(errMsg)
 			}
 		}
 	}
