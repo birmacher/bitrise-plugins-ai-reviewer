@@ -518,7 +518,7 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		Type: openai.ToolTypeFunction,
 		Function: &openai.FunctionDefinition{
 			Name:        "post_line_feedback",
-			Description: "Posts line-level feedback for a pull request",
+			Description: "Posts found issues as line-level feedback for a pull request",
 			Parameters: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -592,7 +592,7 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	if args.Ref == "" {
+	if args.Ref != "" {
 		args.Ref = "HEAD"
 	}
 
