@@ -846,8 +846,8 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
 	}
 
-	if args.Summary == "" || args.Walkthrough == "" || args.Haiku == "" {
-		return "", fmt.Errorf("summary, walkthrough and haiku must be provided")
+	if args.Summary == "" {
+		return "", fmt.Errorf("summary must be provided")
 	}
 
 	logger.Infof("🤖 Posting summary")
@@ -915,9 +915,15 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 	}
 
 	// Validate required fields
-	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber == 0 || args.File == "" || args.Line == "" || args.Issue == "" {
-		return "", fmt.Errorf("missing required field in post_line_feedback arguments")
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
+		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
 	}
+
+	if args.File == "" || args.Line == "" || args.Issue == "" {
+		return "", fmt.Errorf("file, line and issue must be provided")
+	}
+
+	logger.Infof("🤖 Posting line fedback for %s", args.File)
 
 	lineFeedback := common.LineLevel{
 		File:       args.File,
