@@ -688,21 +688,12 @@ func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string)
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
 	}
 
-	var pullRequestDetails common.PullRequest
-	if o.GitProvider == nil {
-		return "", fmt.Errorf("git provider is not set, cannot fetch PR details")
-	} else {
-		// Create a new GitHub client
-		fmt.Println("Fetching pull request details...")
-		details, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
-		fmt.Println(details)
-		if err != nil {
-			return "", fmt.Errorf("failed to get PR details: %v", err)
-		}
-		pullRequestDetails = details
+	// Create a new GitHub client
+	fmt.Println("Fetching pull request details...")
+	pullRequestDetails, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
+	if err != nil {
+		return "", fmt.Errorf("failed to get PR details: %v", err)
 	}
-
-	logger.Debug(pullRequestDetails.String())
 
 	return pullRequestDetails.String(), nil
 }
