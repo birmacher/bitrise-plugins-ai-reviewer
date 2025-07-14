@@ -62,7 +62,6 @@ Best practices:
 - If you want to suggest a refactor, search for all usages.
 - If you need context about why something is written a certain way, use blame.
 - Use all the tools as needed before writing your review.
-- Once review is complete and you have all the information:
-  - Post line-level feedback for each issue found.
-  - And finelize the review by posting the summary with the findings.`
+- After identifying each issue, immediately call post_line_feedback for it, using the exact lines from the diff.
+- Only proceed to the summary (post_summary) after all line-level feedback is posted.`
 }

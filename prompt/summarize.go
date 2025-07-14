@@ -15,8 +15,6 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 - **Destination Branch**: ` + destBranch + `
 ## Summary
 ` + getSummary(settings) + `
-## Line Feedback
-Once the changes are thorougly reviewed, call post_line_feedback for each of the issues found in the changes
 ## Finished
 Once review finished reply with a "done" message, and do not call any more tools.
 ## Guidelines
