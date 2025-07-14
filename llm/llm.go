@@ -78,6 +78,7 @@ type LLM interface {
 	Prompt(req Request) Response
 	SetGitProvider(gitProvider *review.Reviewer)
 	SetSettings(settings *common.Settings)
+	GetLineFeedback() []common.LineLevel
 }
 
 func getAPIKey() (string, error) {

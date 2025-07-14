@@ -16,12 +16,13 @@ import (
 
 // AnthropicModel implements the LLM interface using Anthropic's API
 type AnthropicModel struct {
-	client      anthropic.Client
-	modelName   string
-	maxTokens   int
-	apiTimeout  int // in seconds
-	GitProvider *review.Reviewer
-	Settings    *common.Settings
+	client       anthropic.Client
+	modelName    string
+	maxTokens    int
+	apiTimeout   int // in seconds
+	GitProvider  *review.Reviewer
+	Settings     *common.Settings
+	LineFeedback []common.LineLevel
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -150,4 +151,8 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	return Response{
 		Content: content,
 	}
+}
+
+func (a *AnthropicModel) GetLineFeedback() []common.LineLevel {
+	return a.LineFeedback
 }

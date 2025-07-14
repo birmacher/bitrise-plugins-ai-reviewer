@@ -131,13 +131,9 @@ var summarizeCmd = &cobra.Command{
 
 		// Send to the review provider
 		if codeReviewerName != "" {
-			lineLevel, err := common.ParseLineLevelFeedback(resp.Content)
-			if err != nil {
-				errMsg := fmt.Sprintf("Error posting summary: %v", err)
-				logger.Errorf(errMsg)
-				return errors.New(errMsg)
+			lineLevel := common.LineLevelFeedback{
+				Lines: llmClient.GetLineFeedback(),
 			}
-
 			for idx, ll := range lineLevel.Lines {
 				// Get the line numbers
 				lineNumber, err := common.GetLineNumber(ll.File, []byte(fileContent), []byte(diff), ll.FirstLine())

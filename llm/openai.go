@@ -30,12 +30,13 @@ const (
 
 // OpenAIModel implements the LLM interface using OpenAI's API
 type OpenAIModel struct {
-	client      *openai.Client
-	modelName   string
-	maxTokens   int
-	apiTimeout  int // in seconds
-	GitProvider *review.Reviewer
-	Settings    *common.Settings
+	client       *openai.Client
+	modelName    string
+	maxTokens    int
+	apiTimeout   int // in seconds
+	GitProvider  *review.Reviewer
+	Settings     *common.Settings
+	LineFeedback []common.LineLevel
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -149,7 +150,13 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 	ctx = context.WithValue(ctx, messagesKey, []openai.ChatCompletionMessage{})
 	ctx = context.WithValue(ctx, toolCallDepthKey, 1)
 
+	o.LineFeedback = []common.LineLevel{}
+
 	return o.promptWithContext(ctx, req, nil, ToolUseRequired, false)
+}
+
+func (o *OpenAIModel) GetLineFeedback() []common.LineLevel {
+	return o.LineFeedback
 }
 
 // handleToolCalls processes any tool calls in the response and sends follow-up requests if needed
@@ -920,7 +927,8 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 		Suggestion: args.Suggestion,
 	}
 
-	logger.Debugf("line feedback: %s", lineFeedback)
+	logger.Debugf("line feedback added to queue for file: %s", lineFeedback.File)
+	o.LineFeedback = append(o.LineFeedback, lineFeedback)
 
 	return "Line feedback processed successfully", nil
 }
