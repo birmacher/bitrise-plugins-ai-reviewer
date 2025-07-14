@@ -51,8 +51,9 @@ You have the following tools:
 - read_file: Use to read any file if the diff is unclear.
 - search_codebase: Use if a function, class, or symbol appears in the diff and you want to know where else it is used or defined.
 - get_git_blame: Use to see who last modified a line or to understand why a change was made.
-- post_summary: Use to post a summary of the review findings, including any haiku or walkthrough.
 - post_line_feedback: Use to post line-level feedback on specific lines of code, including suggestions for improvement.
+- post_summary: Use to post a summary of the review findings, including any haiku or walkthrough.
+
 
 Best practices:
 - Get the pull request details first to understand the context

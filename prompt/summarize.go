@@ -13,10 +13,12 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 - **Pull Request**: ` + pr + `
 - **Commit Hash**: ` + commitHash + `
 - **Destination Branch**: ` + destBranch + `
-## Summary
-` + getSummary(settings) + `
+## During review
+- post_line_feedback immediately after finding an issue, do not wait for the review to finish
+- post_summary at the end of the review, summarizing the changes and issues found
+- for the summary include: ` getSummary(settings) + `
 ## Finished
-Once review finished reply with a "done" message, and do not call any more tools.
+Once line feedbacks and summary posted you should reply with a "done" message, and do not call any more tools.
 ## Guidelines
 - Only include lines present in the diff hunk. Do not make up or synthesize lines.
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
@@ -41,8 +43,8 @@ func getSummary(settings common.Settings) string {
 			include = append(include, "haiku")
 		}
 
-		return `Use the post_summary tool to provide a summary of the changes in the pull request. Include ` + strings.Join(include, ", ") + `.`
+		return strings.Join(include, ", ")
 	}
 
-	return `Skip sending summary, no need to use the post_summary tool.`
+	return `Skip sending summary`
 }

@@ -850,7 +850,7 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 		return "", fmt.Errorf("summary, walkthrough and haiku must be provided")
 	}
 
-	logger.Infof("🤖 Posting summary: %s")
+	logger.Infof("🤖 Posting summary")
 
 	if o.GitProvider == nil {
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
