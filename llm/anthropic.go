@@ -20,7 +20,7 @@ type AnthropicModel struct {
 	modelName   string
 	maxTokens   int
 	apiTimeout  int // in seconds
-	GitProvider *review.Reviewer
+	GitProvider review.Reviewer
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -69,7 +69,7 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 			if tools, ok := opt.Value.(Tools); ok {
 				model.GitProvider = tools.GitProvider
 				if model.GitProvider != nil {
-					logger.Debugf("Anthropic client configured with Git provider: %s", (*model.GitProvider).GetProvider())
+					logger.Debugf("Anthropic client configured with Git provider: %s", (model.GitProvider).GetProvider())
 				}
 			} else {
 				errMsg := "tool option must be of type Tools"

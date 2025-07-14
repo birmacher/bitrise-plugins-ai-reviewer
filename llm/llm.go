@@ -79,7 +79,7 @@ type Response struct {
 }
 
 type Tools struct {
-	GitProvider *review.Reviewer
+	GitProvider review.Reviewer
 }
 
 // LLM defines the interface for language model prompting

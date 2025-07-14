@@ -34,7 +34,7 @@ type OpenAIModel struct {
 	modelName   string
 	maxTokens   int
 	apiTimeout  int // in seconds
-	GitProvider *review.Reviewer
+	GitProvider review.Reviewer
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -81,7 +81,7 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 			if tools, ok := opt.Value.(Tools); ok {
 				model.GitProvider = tools.GitProvider
 				if model.GitProvider != nil {
-					logger.Debugf("OpenAI client configured with Git provider: %s", (*model.GitProvider).GetProvider())
+					logger.Debugf("OpenAI client configured with Git provider: %s", (model.GitProvider).GetProvider())
 				}
 			} else {
 				errMsg := "tool option must be of type Tools"
@@ -696,7 +696,7 @@ func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string)
 	}
 
 	// Create a new GitHub client
-	details, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
+	details, err := (o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
 	if err != nil {
 		return "", fmt.Errorf("failed to get PR details: %v", err)
 	}

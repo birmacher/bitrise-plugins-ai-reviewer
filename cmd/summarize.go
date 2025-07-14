@@ -112,7 +112,7 @@ var summarizeCmd = &cobra.Command{
 		if codeReviewerName != "" {
 			// Only provide git provider if code reviewer is specified
 			llmClient, err = llm.NewLLM(provider, model, llm.WithTool(llm.Tools{
-				GitProvider: &gitProvider,
+				GitProvider: gitProvider,
 			}))
 		} else {
 			// No git provider is available
