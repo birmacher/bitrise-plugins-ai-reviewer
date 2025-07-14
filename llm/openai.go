@@ -504,7 +504,7 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 	var content string
 	var err error
 
-	if args.Ref != "" {
+	if args.Ref == "" {
 		args.Ref = "HEAD"
 	}
 
