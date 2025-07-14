@@ -1,6 +1,8 @@
 package prompt
 
 import (
+	"strings"
+
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
@@ -11,6 +13,7 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 - **Pull Request**: ` + pr + `
 - **Commit Hash**: ` + commitHash + `
 - **Destination Branch**: ` + destBranch + `
+## Summary
 ` + getSummary(settings) + `
 ## Line Feedback
 Return a list of issues found in the diff hunks, formatted as objects with these fields:
@@ -35,9 +38,22 @@ Can you review PR ` + pr + ` on repo ` + repoOwner + `/` + repoName + ` (commit:
 
 func getSummary(settings common.Settings) string {
 	if settings.Reviews.Summary {
+		include := []string{}
+		if settings.Reviews.Summary {
+			include = append(include, "summary")
+		}
+		if settings.Reviews.Walkthrough {
+			include = append(include, "walkthrough")
+		}
+		if settings.Reviews.Haiku {
+			include = append(include, "haiku")
+		}
+
 		return `## Summary
 Use the post_summary tool to provide a summary of the changes in the pull request.
-Include summary, walkthrough, and haiku if applicable.`
+Include ` + strings.Join(include, ", ") + `, the remaining parameters (if any) should be an empty string.`
 	}
-	return ""
+
+	return `## Summary
+Skip sending summary, no need to use the post_summary tool.`
 }
