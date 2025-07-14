@@ -200,6 +200,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processGetPullRequestDetailsToolCall(tool.Function.Arguments)
 		case "post_summary":
 			result, err = o.processPostSummaryToolCall(tool.Function.Arguments)
+		case "post_line_feedback":
+			result, err = o.processPostLineFeedbackToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -506,8 +508,71 @@ func (o *OpenAIModel) getTools(lastCall bool) []openai.Tool {
 		},
 	}
 
+	postLineFeedbackTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "post_line_feedback",
+			Description: "Posts line-level feedback for a pull request",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"repo_owner": map[string]interface{}{
+						"type":        "string",
+						"description": "The owner of the repository (e.g., 'bitrise-io')",
+					},
+					"repo_name": map[string]interface{}{
+						"type":        "string",
+						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
+					},
+					"pr_number": map[string]interface{}{
+						"type":        "integer",
+						"description": "The pull request number to retrieve details for",
+					},
+					"file": map[string]interface{}{
+						"type":        "string",
+						"description": "The relative path to the file within the repository",
+					},
+					"issue": map[string]interface{}{
+						"type":        "string",
+						"description": "A description of the issue found in the code",
+					},
+					"category": map[string]interface{}{
+						"type":        "string",
+						"description": "The category of the feedback from: bug, refactor, improvement, documentation, nitpick, test coverage, security.",
+					},
+					"line": map[string]interface{}{
+						"type":        "string",
+						"description": "The exact line from the diff hunk that you are commenting on.",
+					},
+					"prompt": map[string]interface{}{
+						"type":        "string",
+						"description": "A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).",
+					},
+					"suggestion": map[string]interface{}{
+						"type":        "string",
+						"description": "An optional suggestion for how to fix the issue. If provided, it should be a complete code snippet that can be applied directly to the file.",
+					},
+				},
+				"required": []string{"repo_owner", "repo_name", "pr_number", "file", "summary", "category", "line", "prompt"},
+				"examples": []map[string]interface{}{
+					{
+						"repo_owner": "bitrise-io",
+						"repo_name":  "bitrise-plugins-ai-reviewer",
+						"pr_number":  42,
+						"file":       "main.go",
+						"issue":      "This line has a potential bug where the variable is not initialized before use.",
+						"category":   "bug",
+						"line":       "\t\tif x > 0 {",
+						"prompt":     "Initialize the variable x before using it to avoid potential runtime errors",
+						"suggestion": "\tx := 0 // Initialize x before use\n\t\tif x > 0 {",
+					},
+				},
+			},
+		},
+	}
+
 	if lastCall {
-		return []openai.Tool{postSummaryTool}
+		return []openai.Tool{postSummaryTool, postLineFeedbackTool}
 	}
 	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool}
 }
@@ -825,6 +890,39 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 	}
 
 	return "Summary posted successfully", nil
+}
+
+func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing post line feedback tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		RepoOwner  string `json:"repo_owner"`
+		RepoName   string `json:"repo_name"`
+		PRNumber   int    `json:"pr_number"`
+		File       string `json:"file"`
+		Issue      string `json:"issue"`
+		Category   string `json:"category"`
+		Line       string `json:"line"`
+		Prompt     string `json:"prompt"`
+		Suggestion string `json:"suggestion,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	lineFeedback := common.LineLevel{
+		File:       args.File,
+		Body:       args.Issue,
+		Category:   args.Category,
+		Line:       args.Line,
+		Prompt:     args.Prompt,
+		Suggestion: args.Suggestion,
+	}
+
+	logger.Debugf("line feedback: %s", lineFeedback)
+
+	return "Line feedback processed successfully", nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
