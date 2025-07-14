@@ -24,7 +24,6 @@ Once line feedbacks and summary posted you should reply with a "done" message, a
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
 - For "nitpick", only flag truly minor, non-blocking style suggestions.
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
-- "content" and "suggestion" should be always valid code blocks, formatted with triple backticks ` + "(```)" + `.
 - Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
 ## Task
 Can you review PR ` + pr + ` on repo ` + repoOwner + `/` + repoName + ` (commit: ` + commitHash + `, branch: ` + destBranch + `)?`

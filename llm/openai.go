@@ -559,7 +559,7 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 						"description": "An optional suggestion for how to fix the issue. If provided, it should be a complete code snippet that can be applied directly to the file.",
 					},
 				},
-				"required": []string{"repo_owner", "repo_name", "pr_number", "file", "summary", "category", "line", "prompt"},
+				"required": []string{"repo_owner", "repo_name", "pr_number", "file", "issue", "category", "line", "prompt"},
 				"examples": []map[string]interface{}{
 					{
 						"repo_owner": "bitrise-io",
@@ -592,7 +592,7 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	if args.Ref != "" {
+	if args.Ref == "" {
 		args.Ref = "HEAD"
 	}
 
@@ -912,6 +912,11 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 	}
 	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber == 0 || args.File == "" || args.Line == "" || args.Issue == "" {
+		return "", fmt.Errorf("missing required field in post_line_feedback arguments")
 	}
 
 	lineFeedback := common.LineLevel{
