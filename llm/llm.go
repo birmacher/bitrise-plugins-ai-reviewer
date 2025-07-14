@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 )
@@ -79,6 +80,7 @@ type LLM interface {
 	// Prompt sends a request to the language model and returns its response
 	Prompt(req Request) Response
 	SetGitProvider(gitProvider *review.Reviewer)
+	SetSettings(settings *common.Settings)
 }
 
 func getAPIKey() (string, error) {

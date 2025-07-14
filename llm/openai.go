@@ -35,6 +35,7 @@ type OpenAIModel struct {
 	maxTokens   int
 	apiTimeout  int // in seconds
 	GitProvider *review.Reviewer
+	Settings    *common.Settings
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -85,6 +86,10 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 
 func (o *OpenAIModel) SetGitProvider(gitProvider *review.Reviewer) {
 	o.GitProvider = gitProvider
+}
+
+func (o *OpenAIModel) SetSettings(settings *common.Settings) {
+	o.Settings = settings
 }
 
 func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
@@ -772,14 +777,14 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 		return "", fmt.Errorf("summary, walkthrough and haiku must be provided")
 	}
 
-	logger.Infof("🤖 Posting summary: %s", args.Summary)
+	logger.Infof("🤖 Posting summary: %s")
 
 	if o.GitProvider == nil {
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
 	}
 
 	walkthrough := make([]common.Walkthrough, 0)
-	for _, line := range strings.Split(args.Walkthrough, "\n") {
+	for line := range strings.SplitSeq(args.Walkthrough, "\n") {
 		if line == "" {
 			continue
 		}
@@ -803,9 +808,8 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 		Haiku:       args.Haiku,
 	}
 
-	// TODO
 	headerStr := summary.Header()
-	summaryStr := summary.String((*o.GitProvider).GetProvider(), common.WithDefaultSettings())
+	summaryStr := summary.String((*o.GitProvider).GetProvider(), *o.Settings)
 
 	logger.Debugf("Posting summary")
 	logger.Debugf("Summary %s", summaryStr)

@@ -118,6 +118,7 @@ var summarizeCmd = &cobra.Command{
 		if gitProvider != nil {
 			llmClient.SetGitProvider(&gitProvider)
 		}
+		llmClient.SetSettings(&settings)
 
 		// Setup the prompt
 		req := llm.Request{
@@ -141,19 +142,19 @@ var summarizeCmd = &cobra.Command{
 
 		// Send to the review provider
 		if codeReviewerName != "" {
-			summary, err := common.ParseSummary(resp.Content)
+			// summary, err := common.ParseSummary(resp.Content)
 			if err != nil {
 				errMsg := fmt.Sprintf("Error parsing LLM Response for summary: %v", err)
 				logger.Errorf(errMsg)
 				return errors.New(errMsg)
 			}
 
-			err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(gitProvider.GetProvider(), settings))
-			if err != nil {
-				errMsg := fmt.Sprintf("Error posting summary: %v", err)
-				logger.Errorf(errMsg)
-				return errors.New(errMsg)
-			}
+			// err = gitProvider.PostSummary(repoOwner, repoName, pr, summary.Header(), summary.String(gitProvider.GetProvider(), settings))
+			// if err != nil {
+			// 	errMsg := fmt.Sprintf("Error posting summary: %v", err)
+			// 	logger.Errorf(errMsg)
+			// 	return errors.New(errMsg)
+			// }
 
 			lineLevel, err := common.ParseLineLevelFeedback(resp.Content)
 			if err != nil {
