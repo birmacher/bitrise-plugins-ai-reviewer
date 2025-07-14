@@ -78,11 +78,13 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 				model.apiTimeout = timeout
 			}
 		case ToolOption:
-			if gitProvider, ok := opt.Value.(review.Reviewer); ok {
-				model.GitProvider = &gitProvider
-				logger.Debugf("OpenAI client configured with Git provider: %s", gitProvider.GetProvider())
+			if tools, ok := opt.Value.(Tools); ok {
+				model.GitProvider = tools.GitProvider
+				if model.GitProvider != nil {
+					logger.Debugf("OpenAI client configured with Git provider: %s", (*model.GitProvider).GetProvider())
+				}
 			} else {
-				errMsg := "tool option must be of type *review.Reviewer"
+				errMsg := "tool option must be of type Tools"
 				logger.Error(errMsg)
 				return nil, errors.New(errMsg)
 			}

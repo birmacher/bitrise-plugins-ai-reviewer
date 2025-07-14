@@ -66,11 +66,13 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 				model.apiTimeout = timeout
 			}
 		case ToolOption:
-			if gitProvider, ok := opt.Value.(review.Reviewer); ok {
-				model.GitProvider = &gitProvider
-				logger.Debugf("Anthropic client configured with Git provider: %s", gitProvider.GetProvider())
+			if tools, ok := opt.Value.(Tools); ok {
+				model.GitProvider = tools.GitProvider
+				if model.GitProvider != nil {
+					logger.Debugf("Anthropic client configured with Git provider: %s", (*model.GitProvider).GetProvider())
+				}
 			} else {
-				errMsg := "Tool option must be of type *review.Reviewer"
+				errMsg := "tool option must be of type Tools"
 				logger.Error(errMsg)
 				return nil, errors.New(errMsg)
 			}
