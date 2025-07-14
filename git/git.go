@@ -107,9 +107,6 @@ func (c *Client) ListFiles(commitHash string) (string, error) {
 	return output, nil
 }
 
-// GetFileContents retrieves the content of all files changed in the specified commit.
-// If targetBranch is provided, it compares against the merge-base with that branch.
-// Returns a formatted string containing the content of all changed files.
 func (c *Client) GetFileContents(commitHash, targetBranch string) (string, error) {
 	logger.Info("Generating file contents...")
 
@@ -356,15 +353,13 @@ func (c *Client) GetBlame(ref string, filePath string, startLine, endLine int) (
 	// Add the reference and file path
 	args = append(args, ref, "--", filePath)
 
-	// Execute git blame command
 	output, err := c.runner.Run("git", args...)
 	if err != nil {
 		return "", fmt.Errorf("git blame command failed: %v", err)
 	}
 
-	// If no output was returned but the command succeeded, the file might be empty
 	if output == "" {
-		return "File is empty or doesn't exist at the specified reference.", nil
+		return "No blame information found for the specified file and lines.", nil
 	}
 
 	return output, nil

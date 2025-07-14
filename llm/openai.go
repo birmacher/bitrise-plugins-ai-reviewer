@@ -611,9 +611,6 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing list directory tool call")
-
-	// Parse the arguments JSON
 	var args struct {
 		Ref string `json:"ref,omitempty"`
 	}
@@ -632,7 +629,7 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 	output, err := git.ListFiles(args.Ref)
 
 	if err != nil {
-		return "", fmt.Errorf("git ls-tree command failed: %v", err)
+		return "", fmt.Errorf("failed to list directory contents: %v", err)
 	}
 
 	if output == "" {
@@ -644,9 +641,6 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 
 // processGitDiffToolCall extracts parameters and executes the git diff command
 func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing git diff tool call")
-
-	// Parse the arguments JSON
 	var args struct {
 		Target string `json:"target"`
 		Source string `json:"source"`
@@ -656,8 +650,12 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
+	if args.Source == "" {
+		args.Source = "HEAD"
+	}
+
 	// Validate required fields
-	if args.Target == "" || args.Source == "" {
+	if args.Target == "" {
 		return "", fmt.Errorf("both source and target must be provided")
 	}
 
@@ -671,7 +669,7 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 	}
 
 	if output == "" {
-		return "No changes found between the specified references.", nil
+		return "No changes found in diff.", nil
 	}
 
 	return output, nil
@@ -679,9 +677,6 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 
 // processReadFileToolCall extracts parameters and reads the specified file
 func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing read file tool call")
-
-	// Parse the arguments JSON
 	var args struct {
 		Path      string `json:"path"`
 		Ref       string `json:"ref"`
@@ -698,21 +693,20 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 		return "", fmt.Errorf("file path must be provided")
 	}
 
+	logger.Infof("🤖 Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
+
 	// Sanitize the path to prevent directory traversal attacks
 	cleanPath := filepath.Clean(args.Path)
 	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) && strings.HasPrefix(cleanPath, "/") {
 		return "", fmt.Errorf("invalid path: %s", args.Path)
 	}
 
-	// Get file content either from git or filesystem
 	var content string
 	var err error
 
 	if args.Ref == "" {
 		args.Ref = "HEAD"
 	}
-
-	logger.Infof("🤖 Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	content, err = git.GetFileContent(args.Ref, cleanPath)
@@ -750,9 +744,6 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 }
 
 func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing search codebase tool call")
-
-	// Parse the arguments JSON
 	var args struct {
 		Query    string `json:"query"`
 		Ref      string `json:"ref"`
@@ -764,7 +755,8 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	// Validate required fields
+	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s", args.Query, args.Ref)
+
 	if args.Query == "" {
 		return "", fmt.Errorf("search query must be provided")
 	}
@@ -773,13 +765,17 @@ func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (strin
 		args.Ref = "HEAD"
 	}
 
-	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s", args.Query, args.Ref)
-
 	git := git.NewClient(git.NewDefaultRunner("."))
 	content, err := git.Grep(args.Ref, args.Query, args.UseRegex, args.Path)
+
 	if err != nil {
 		return "", fmt.Errorf("git grep command failed: %v", err)
 	}
+
+	if content == "" {
+		return "No matches found for the search query.", nil
+	}
+
 	return content, nil
 }
 
@@ -799,19 +795,17 @@ func (o *OpenAIModel) processGitBlameToolCall(argumentsJSON string) (string, err
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	// Validate required fields
+	logger.Infof("🤖 Getting git blame for file: `%s`, lines %d to %d, ref: %s",
+		args.Path, args.StartLine, args.EndLine, args.Ref)
+
 	if args.Path == "" {
 		return "", fmt.Errorf("file path must be provided")
 	}
 
-	// Sanitize the path to prevent directory traversal attacks
 	cleanPath := filepath.Clean(args.Path)
 	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) && strings.HasPrefix(cleanPath, "/") {
 		return "", fmt.Errorf("invalid path: %s", args.Path)
 	}
-
-	logger.Infof("🤖 Getting git blame for file: `%s`, lines %d to %d, ref: %s",
-		args.Path, args.StartLine, args.EndLine, args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	output, err := git.GetBlame(args.Ref, cleanPath, args.StartLine, args.EndLine)
@@ -820,34 +814,34 @@ func (o *OpenAIModel) processGitBlameToolCall(argumentsJSON string) (string, err
 		return "", fmt.Errorf("git blame command failed: %v", err)
 	}
 
+	if output == "" {
+		return "No blame information found for the specified file and lines.", nil
+	}
+
 	return output, nil
 }
 
 func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing get pull request details tool call")
-	// Parse the arguments JSON
 	var args struct {
 		RepoOwner string `json:"repo_owner"`
 		RepoName  string `json:"repo_name"`
 		PRNumber  int    `json:"pr_number"`
 	}
+
 	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
-	}
-	// Validate required fields
-	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
-		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
 	}
 
 	logger.Infof("🤖 Getting pull request details for %s/%s PR #%d", args.RepoOwner, args.RepoName, args.PRNumber)
 
-	// Check if GitProvider is properly initialized
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
+		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
+	}
+
 	if o.GitProvider == nil {
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
 	}
 
-	// Create a new GitHub client
-	fmt.Println("Fetching pull request details...")
 	pullRequestDetails, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
 	if err != nil {
 		return "", fmt.Errorf("failed to get PR details: %v", err)
@@ -857,8 +851,6 @@ func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string)
 }
 
 func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing post summary tool call")
-	// Parse the arguments JSON
 	var args struct {
 		RepoOwner   string `json:"repo_owner"`
 		RepoName    string `json:"repo_name"`
@@ -872,6 +864,8 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
+	logger.Infof("🤖 Posting summary")
+
 	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
 		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
 	}
@@ -879,8 +873,6 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 	if args.Summary == "" {
 		return "", fmt.Errorf("summary must be provided")
 	}
-
-	logger.Infof("🤖 Posting summary")
 
 	if o.GitProvider == nil {
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
@@ -914,9 +906,6 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 	headerStr := summary.Header()
 	summaryStr := summary.String((*o.GitProvider).GetProvider(), *o.Settings)
 
-	logger.Debugf("Posting summary")
-	logger.Debugf("Summary %s", summaryStr)
-
 	err := (*o.GitProvider).PostSummary(args.RepoOwner, args.RepoName, args.PRNumber, headerStr, summaryStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to post summary: %v", err)
@@ -926,9 +915,6 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 }
 
 func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (string, error) {
-	logger.Debug("Processing post line feedback tool call")
-
-	// Parse the arguments JSON
 	var args struct {
 		RepoOwner  string `json:"repo_owner"`
 		RepoName   string `json:"repo_name"`
@@ -944,7 +930,8 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	// Validate required fields
+	logger.Infof("🤖 Posting line fedback for %s", args.File)
+
 	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
 		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
 	}
@@ -952,8 +939,6 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 	if args.File == "" || args.Line == "" || args.Issue == "" {
 		return "", fmt.Errorf("file, line and issue must be provided")
 	}
-
-	logger.Infof("🤖 Posting line fedback for %s", args.File)
 
 	lineFeedback := common.LineLevel{
 		File:       args.File,
@@ -964,7 +949,6 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 		Suggestion: args.Suggestion,
 	}
 
-	logger.Debugf("line feedback added to queue for file: %s", lineFeedback.File)
 	o.LineFeedback = append(o.LineFeedback, lineFeedback)
 
 	return fmt.Sprintf("Line feedback processed successfully for file %s", lineFeedback.File), nil
@@ -994,11 +978,12 @@ func (o *OpenAIModel) handleAPIError(errMsg string, toolCalls interface{}) Respo
 // createToolResponse creates a message with the tool response, handling any errors
 func createToolResponse(toolID string, content string, err error) openai.ChatCompletionMessage {
 	if err != nil {
-		// The error message is already logged in the tool-specific handler
+		logger.Warnf("Tool call %s failed: %v", toolID, err)
 		content = fmt.Sprintf("Error: %v", err)
 	}
 
 	if content == "" {
+		logger.Warnf("Tool call %s returned empty content, using placeholder", toolID)
 		content = emptyContentKey
 	}
 
