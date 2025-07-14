@@ -24,7 +24,7 @@ const (
 	messagesKey      contextKey = "messages"
 	maxToolCallDepth int        = 10
 	ToolUseRequired  string     = "required"
-	ToolUseDAuto     string     = "auto"
+	ToolUseAuto      string     = "auto"
 	ToolUseDisabled  string     = "none"
 )
 
@@ -93,7 +93,7 @@ func (o *OpenAIModel) SetSettings(settings *common.Settings) {
 	o.Settings = settings
 }
 
-func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string, lastCall bool) Response {
+func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
 	// Create base messages with system and user prompts
 	messages := []openai.ChatCompletionMessage{
 		{
@@ -112,7 +112,7 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 	}
 
 	// Create and send the completion request
-	chatReq := o.createChatCompletionRequest(messages, toolChoice, lastCall)
+	chatReq := o.createChatCompletionRequest(messages, toolChoice)
 
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
@@ -152,7 +152,7 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 
 	o.LineFeedback = []common.LineLevel{}
 
-	return o.promptWithContext(ctx, req, nil, ToolUseRequired, false)
+	return o.promptWithContext(ctx, req, nil, ToolUseRequired)
 }
 
 func (o *OpenAIModel) GetLineFeedback() []common.LineLevel {
@@ -221,12 +221,11 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	allMessages := append(existingMessages, newMessages...)
 
 	// Create and send follow-up request with tool results
-	toolChoice := ToolUseDAuto
-	lastCall := false
+	toolChoice := ToolUseAuto
+
 	if depth > maxToolCallDepth {
 		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
-		toolChoice = ToolUseRequired
-		lastCall = true
+		toolChoice = ToolUseDisabled
 	}
 
 	// Create new context with incremented depth and message history
@@ -239,7 +238,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	logger.Debugf("Sending next prompt with %d total accumulated messages at depth %d", len(allMessages), depth+1)
 
 	// Get response from the next recursive prompt with full conversation history
-	nextResponse := o.promptWithContext(newCtx, originalReq, allMessages, toolChoice, lastCall)
+	nextResponse := o.promptWithContext(newCtx, originalReq, allMessages, toolChoice)
 
 	// If there was an error in the next call, return it directly
 	if nextResponse.Error != nil {
@@ -254,7 +253,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 }
 
 // getTools returns the list of available tools
-func (o *OpenAIModel) getTools(lastCall bool) []openai.Tool {
+func (o *OpenAIModel) getTools() []openai.Tool {
 	// List directory
 	ListDirTool := openai.Tool{
 		Type: openai.ToolTypeFunction,
@@ -578,10 +577,7 @@ func (o *OpenAIModel) getTools(lastCall bool) []openai.Tool {
 		},
 	}
 
-	if lastCall {
-		return []openai.Tool{postSummaryTool, postLineFeedbackTool}
-	}
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool}
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -934,13 +930,13 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
-func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string, lastCall bool) openai.ChatCompletionRequest {
+func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
 		Temperature: 0.2,
-		Tools:       o.getTools(lastCall),
+		Tools:       o.getTools(),
 		ToolChoice:  toolChoice,
 	}
 }
