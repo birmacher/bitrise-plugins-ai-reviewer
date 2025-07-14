@@ -83,6 +83,7 @@ func TestEncodeLLMKey(t *testing.T) {
 }
 
 func TestDecodeLLMValue(t *testing.T) {
+	// Test base64 encoded value
 	encodedValue := "CWZ1bmMgZXhhbXBsZSgpIHsKCQlmbXQuUHJpbnRsbigiVGhpcyBpcyBhIHN1Z2dlc3Rpb24iKQ=="
 	expectedValue := `	func example() {
 		fmt.Println("This is a suggestion")`
@@ -94,5 +95,17 @@ func TestDecodeLLMValue(t *testing.T) {
 
 	if decodedValue != expectedValue {
 		t.Errorf("Expected decoded value to be %s, got %s", expectedValue, decodedValue)
+	}
+	
+	// Test non-base64 value (plain text)
+	plainValue := "> New tools in the breeze\n> Codebase whispers, search, blame, fetch—\n> Review magic grows 🌱🤖"
+	
+	decodedPlainValue, err := DecodeLLMValue(plainValue)
+	if err != nil {
+		t.Errorf("Failed to handle non-base64 value: %v", err)
+	}
+	
+	if decodedPlainValue != plainValue {
+		t.Errorf("Expected plain text value to be returned as-is, got %s", decodedPlainValue)
 	}
 }

@@ -5,6 +5,6 @@ reviews:
   summary: true
   walkthrough: true
   collapse_walkthrough: false
-  haiku: false
+  haiku: true
   path_filters: ""
   path_instructions: ""

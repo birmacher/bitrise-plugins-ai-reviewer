@@ -11,14 +11,16 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 )
 
 // AnthropicModel implements the LLM interface using Anthropic's API
 type AnthropicModel struct {
-	client     anthropic.Client
-	modelName  string
-	maxTokens  int
-	apiTimeout int // in seconds
+	client      anthropic.Client
+	modelName   string
+	maxTokens   int
+	apiTimeout  int // in seconds
+	GitProvider *review.Reviewer
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -67,6 +69,10 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 	}
 
 	return model, nil
+}
+
+func (a *AnthropicModel) SetGitProvider(gitProvider *review.Reviewer) {
+	a.GitProvider = gitProvider
 }
 
 // Prompt sends a request to Anthropic and returns the response

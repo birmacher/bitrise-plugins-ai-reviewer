@@ -85,6 +85,11 @@ func (bb *Bitbucket) SupportCollapsibleMarkdown() bool {
 	return false
 }
 
+func (bb *Bitbucket) GetPullRequestDetails(repoOwner, repoName string, pr int) (common.PullRequest, error) {
+	// TODO
+	return common.PullRequest{}, nil
+}
+
 // getComments retrieves all comments for a pull request
 func (bb *Bitbucket) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]CommentResponse, error) {
 	commentsURL := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/comments",

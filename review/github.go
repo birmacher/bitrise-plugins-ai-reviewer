@@ -89,6 +89,69 @@ func (gh *GitHub) SupportCollapsibleMarkdown() bool {
 	return true
 }
 
+func (gh *GitHub) GetPullRequestDetails(repoOwner, repoName string, pr int) (common.PullRequest, error) {
+	logger.Infof("Fetching pull request details for PR #%d in %s/%s", pr, repoOwner, repoName)
+	ctx, cancel := gh.CreateTimeoutContext()
+	defer cancel()
+
+	if repoOwner == "" || repoName == "" || pr <= 0 {
+		errMsg := "invalid repository owner, name or pull request number"
+		logger.Error(errMsg)
+		return common.PullRequest{}, errors.New(errMsg)
+	}
+
+	prDetails, _, err := gh.client.PullRequests.Get(ctx, repoOwner, repoName, pr)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to get pull request details: %v", err)
+		logger.Error(errMsg)
+		return common.PullRequest{}, errors.New(errMsg)
+	}
+
+	owner := ""
+	if prDetails.GetUser() != nil {
+		owner = prDetails.GetUser().GetName()
+	}
+
+	labels := make([]common.Label, 0)
+	for _, label := range prDetails.Labels {
+		labels = append(labels, common.Label{
+			Name: label.GetName(),
+		})
+	}
+
+	commitsList, _, err := gh.client.PullRequests.ListCommits(ctx, repoOwner, repoName, pr, nil)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to list pull request commits: %v", err)
+		logger.Error(errMsg)
+		return common.PullRequest{}, errors.New(errMsg)
+	}
+
+	commits := make([]common.Commit, 0)
+	for _, commit := range commitsList {
+		commits = append(commits, common.Commit{
+			CommitHash: commit.GetSHA(),
+			Author:     commit.GetCommit().GetAuthor().GetName(),
+			Message:    commit.GetCommit().GetMessage(),
+		})
+	}
+
+	return common.PullRequest{
+		Number:     pr,
+		Title:      prDetails.GetTitle(),
+		Body:       prDetails.GetBody(),
+		HeadBranch: prDetails.Head.GetRef(),
+		BaseBranch: prDetails.Base.GetRef(),
+		CreatedAt:  prDetails.GetCreatedAt().String(),
+		UpdatedAt:  prDetails.GetUpdatedAt().String(),
+		Author:     owner,
+		Mergeable:  prDetails.GetMergeable(),
+		Merged:     prDetails.GetMerged(),
+		Labels:     labels,
+		Commits:    commits,
+	}, nil
+
+}
+
 func (gh *GitHub) getComments(ctx context.Context, repoOwner, repoName string, pr int) ([]*github.IssueComment, error) {
 	comments, _, err := gh.client.Issues.ListComments(
 		ctx,

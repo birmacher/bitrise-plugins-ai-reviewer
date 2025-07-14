@@ -313,3 +313,59 @@ func (c *Client) getChangedFilesForCommit(commitHash, targetBranch string) ([]st
 
 	return strings.Split(diff, "\n"), nil
 }
+
+func (c *Client) Grep(commitHash, pattern string, isRegex bool, directory string) (string, error) {
+	if commitHash == "" || pattern == "" {
+		errMsg := "commit hash and pattern cannot be empty"
+		logger.Error(errMsg)
+		return "", errors.New(errMsg)
+	}
+
+	args := []string{"grep", "--no-color", "-n", "-I"}
+	if isRegex {
+		args = append(args, "-E")
+	} else {
+		args = append(args, "-F")
+	}
+	args = append(args, pattern, commitHash)
+
+	if directory != "" {
+		args = append(args, "--", directory)
+	}
+
+	return c.runner.Run("git", args...)
+}
+
+// GetBlame retrieves git blame information for a file, showing which commits modified which lines
+func (c *Client) GetBlame(ref string, filePath string, startLine, endLine int) (string, error) {
+	// Default to HEAD if no ref provided
+	if ref == "" {
+		ref = "HEAD"
+		logger.Debug("No ref provided for git blame, using HEAD")
+	}
+
+	// Format the command args
+	args := []string{"blame", "-l"}
+
+	// If line range is specified, add the range
+	if startLine > 0 && endLine >= startLine {
+		lineRange := fmt.Sprintf("-L%d,%d", startLine, endLine)
+		args = append(args, lineRange)
+	}
+
+	// Add the reference and file path
+	args = append(args, ref, "--", filePath)
+
+	// Execute git blame command
+	output, err := c.runner.Run("git", args...)
+	if err != nil {
+		return "", fmt.Errorf("git blame command failed: %v", err)
+	}
+
+	// If no output was returned but the command succeeded, the file might be empty
+	if output == "" {
+		return "File is empty or doesn't exist at the specified reference.", nil
+	}
+
+	return output, nil
+}

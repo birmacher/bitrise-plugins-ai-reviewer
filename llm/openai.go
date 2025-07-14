@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/review"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -30,10 +30,11 @@ const (
 
 // OpenAIModel implements the LLM interface using OpenAI's API
 type OpenAIModel struct {
-	client     *openai.Client
-	modelName  string
-	maxTokens  int
-	apiTimeout int // in seconds
+	client      *openai.Client
+	modelName   string
+	maxTokens   int
+	apiTimeout  int // in seconds
+	GitProvider *review.Reviewer
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -80,6 +81,10 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	}
 
 	return model, nil
+}
+
+func (o *OpenAIModel) SetGitProvider(gitProvider *review.Reviewer) {
+	o.GitProvider = gitProvider
 }
 
 func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
@@ -182,6 +187,12 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processGitDiffToolCall(tool.Function.Arguments)
 		case "read_file":
 			result, err = o.processReadFileToolCall(tool.Function.Arguments)
+		case "search_codebase":
+			result, err = o.processSearchCodebaseToolCall(tool.Function.Arguments)
+		case "get_git_blame":
+			result, err = o.processGitBlameToolCall(tool.Function.Arguments)
+		case "get_pull_request_details":
+			result, err = o.processGetPullRequestDetailsToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -329,7 +340,116 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool}
+	searchCodebaseTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "search_codebase",
+			Description: "Searches for a string or regex pattern in the codebase. Returns file paths and line numbers where the pattern matches.",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "The string or regex pattern to search for.",
+					},
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to search in. Defaults to current working directory.",
+					},
+					"use_regex": map[string]interface{}{
+						"type":        "boolean",
+						"description": "If true, treats the query as a regex pattern.",
+					},
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional: Restrict search to files under this directory path.",
+					},
+				},
+				"required": []string{"query"},
+			},
+		},
+	}
+
+	// Define the git blame tool
+	gitBlameTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_git_blame",
+			Description: "Gets git blame information for a file or specific lines in a file, showing which commits last modified each line",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "The relative path to the file within the repository",
+					},
+					"startLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional starting line number (1-indexed). If provided with endLine, only returns blame for the specified range of lines.",
+					},
+					"endLine": map[string]interface{}{
+						"type":        "integer",
+						"description": "Optional ending line number (1-indexed, inclusive). Must be used with startLine.",
+					},
+					"ref": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional git reference (branch, tag, or commit hash) to get blame for. If not provided, uses HEAD.",
+					},
+				},
+				"required": []string{"path"},
+				"examples": []map[string]interface{}{
+					{
+						"path": "main.go",
+					},
+					{
+						"path":      "cmd/root.go",
+						"startLine": 10,
+						"endLine":   20,
+					},
+				},
+			},
+		},
+	}
+
+	getPullRequestDetailsTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_pull_request_details",
+			Description: "Retrieves details about a pull request, including its title, description, author, and status",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"repo_owner": map[string]interface{}{
+						"type":        "string",
+						"description": "The owner of the repository (e.g., 'bitrise-io')",
+					},
+					"repo_name": map[string]interface{}{
+						"type":        "string",
+						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
+					},
+					"pr_number": map[string]interface{}{
+						"type":        "integer",
+						"description": "The pull request number to retrieve details for",
+					},
+				},
+				"required": []string{"repo_owner", "repo_name", "pr_number"},
+				"examples": []map[string]interface{}{
+					{
+						"repo_owner": "bitrise-io",
+						"repo_name":  "bitrise-plugins-ai-reviewer",
+						"pr_number":  42,
+					},
+					{
+						"repo_owner": "bitrise-io",
+						"repo_name":  "bitrise-plugins-ai-reviewer",
+						"pr_number":  100,
+					},
+				},
+			},
+		},
+	}
+
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -348,7 +468,7 @@ func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, erro
 		args.Ref = "HEAD"
 	}
 
-	logger.Infof("Listing directory contents at ref: %s", args.Ref)
+	logger.Infof("🤖 Listing git directory contents at ref: %s", args.Ref)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	output, err := git.ListFiles(args.Ref)
@@ -383,7 +503,7 @@ func (o *OpenAIModel) processGitDiffToolCall(argumentsJSON string) (string, erro
 		return "", fmt.Errorf("both source and target must be provided")
 	}
 
-	logger.Infof("Getting git diff between `%s` and `%s`", args.Source, args.Target)
+	logger.Infof("🤖 Getting git diff between `%s` and `%s`", args.Source, args.Target)
 
 	git := git.NewClient(git.NewDefaultRunner("."))
 	output, err := git.GetDiff(args.Source, args.Target)
@@ -430,26 +550,16 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 	var content string
 	var err error
 
-	if args.Ref != "" {
-		logger.Infof("Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
-
-		git := git.NewClient(git.NewDefaultRunner("."))
-		content, err = git.GetFileContent(args.Ref, cleanPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to get file content from git: %v", err)
-		}
-	} else {
-		logger.Infof("Reading file: `%s`, lines %d to %d", args.Path, args.StartLine, args.EndLine)
-
-		contentBytes, err := os.ReadFile(cleanPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to read file: %v", err)
-		}
-		content = string(contentBytes)
+	if args.Ref == "" {
+		args.Ref = "HEAD"
 	}
 
+	logger.Infof("🤖 Reading file: `%s`, lines %d to %d, commitHash: %s", args.Path, args.StartLine, args.EndLine, args.Ref)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	content, err = git.GetFileContent(args.Ref, cleanPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file content: %v", err)
+		return "", fmt.Errorf("failed to get file content from git: %v", err)
 	}
 
 	if args.StartLine > 0 && args.EndLine >= args.StartLine {
@@ -479,6 +589,113 @@ func (o *OpenAIModel) processReadFileToolCall(argumentsJSON string) (string, err
 	}
 
 	return content, nil
+}
+
+func (o *OpenAIModel) processSearchCodebaseToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing search codebase tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Query    string `json:"query"`
+		Ref      string `json:"ref"`
+		UseRegex bool   `json:"use_regex"`
+		Path     string `json:"path"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.Query == "" {
+		return "", fmt.Errorf("search query must be provided")
+	}
+
+	if args.Ref == "" {
+		args.Ref = "HEAD"
+	}
+
+	logger.Infof("🤖 Searching codebase for query: `%s`, ref: %s, use regex: %t, path: %s", args.Query, args.Ref, args.Path)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	content, err := git.Grep(args.Ref, args.Query, args.UseRegex, args.Path)
+	if err != nil {
+		return "", fmt.Errorf("git grep command failed: %v", err)
+	}
+	return content, nil
+}
+
+// processGitBlameToolCall extracts parameters and executes the git blame command
+func (o *OpenAIModel) processGitBlameToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing git blame tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		Path      string `json:"path"`
+		Ref       string `json:"ref"`
+		StartLine int    `json:"startLine"`
+		EndLine   int    `json:"endLine"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.Path == "" {
+		return "", fmt.Errorf("file path must be provided")
+	}
+
+	// Sanitize the path to prevent directory traversal attacks
+	cleanPath := filepath.Clean(args.Path)
+	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) && strings.HasPrefix(cleanPath, "/") {
+		return "", fmt.Errorf("invalid path: %s", args.Path)
+	}
+
+	logger.Infof("🤖 Getting git blame for file: `%s`, lines %d to %d, ref: %s",
+		args.Path, args.StartLine, args.EndLine, args.Ref)
+
+	git := git.NewClient(git.NewDefaultRunner("."))
+	output, err := git.GetBlame(args.Ref, cleanPath, args.StartLine, args.EndLine)
+
+	if err != nil {
+		return "", fmt.Errorf("git blame command failed: %v", err)
+	}
+
+	return output, nil
+}
+
+func (o *OpenAIModel) processGetPullRequestDetailsToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing get pull request details tool call")
+	// Parse the arguments JSON
+	var args struct {
+		RepoOwner string `json:"repo_owner"`
+		RepoName  string `json:"repo_name"`
+		PRNumber  int    `json:"pr_number"`
+	}
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+	// Validate required fields
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
+		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
+	}
+
+	logger.Infof("🤖 Getting pull request details for %s/%s PR #%d", args.RepoOwner, args.RepoName, args.PRNumber)
+
+	// Check if GitProvider is properly initialized
+	if o.GitProvider == nil {
+		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
+	}
+
+	// Create a new GitHub client
+	fmt.Println("Fetching pull request details...")
+	pullRequestDetails, err := (*o.GitProvider).GetPullRequestDetails(args.RepoOwner, args.RepoName, args.PRNumber)
+	if err != nil {
+		return "", fmt.Errorf("failed to get PR details: %v", err)
+	}
+
+	return pullRequestDetails.String(), nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
