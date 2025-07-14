@@ -12,7 +12,6 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 - **Commit Hash**: ` + commitHash + `
 - **Destination Branch**: ` + destBranch + `
 ` + getSummary(settings) + `
-` + getWalkthrough(settings) + `
 ## Line Feedback
 Return a list of issues found in the diff hunks, formatted as objects with these fields:
 - "file": File path where the issue appears.
@@ -28,11 +27,10 @@ Guidelines:
 - For "nitpick", only flag truly minor, non-blocking style suggestions.
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
 - "content" and "suggestion" should be always valid code blocks, formatted with triple backticks ` + "(```)" + `.
-` + getHaiku(settings) + `
 ----
 Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
 ----
-Can you review PR ` + pr + ` on repo bitrise-io/bitrise-plugins-ai-reviewer (commit: ` + commitHash + `, branch: ` + destBranch + `)? Please fetch the diff and file contents as needed, then follow the usual review process.`
+Can you review PR ` + pr + ` on repo ` + repoOwner + `/` + repoName + ` (commit: ` + commitHash + `, branch: ` + destBranch + `)?`
 }
 
 func getSummary(settings common.Settings) string {
@@ -41,23 +39,5 @@ func getSummary(settings common.Settings) string {
 Use the post_summary tool to provide a summary of the changes in the pull request.
 Include summary, walkthrough, and haiku if applicable.`
 	}
-	return ""
-}
-
-func getWalkthrough(settings common.Settings) string {
-	// 	if settings.Reviews.Walkthrough {
-	// 		return `## Walkthrough
-	// A markdown table of file(s) (multiple files should be a string, separated with commas) and their summaries. Group files
-	// with similar changes together into a single row to save space. Return the file name(s) ("files") and a brief summary of the changes ("summary") in each row.`
-	// 	}
-	return ""
-}
-
-func getHaiku(settings common.Settings) string {
-	// 	if settings.Reviews.Haiku {
-	// 		return `## Haiku
-	// Write a whimsical, short haiku to celebrate the changes as "Bit Bot".
-	// Format the haiku as a quote using the ">" symbol and feel free to use emojis where relevant.`
-	// 	}
 	return ""
 }
