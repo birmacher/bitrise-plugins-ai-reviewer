@@ -51,7 +51,9 @@ You have the following tools:
 - read_file: Use to read any file if the diff is unclear.
 - search_codebase: Use if a function, class, or symbol appears in the diff and you want to know where else it is used or defined.
 - get_git_blame: Use to see who last modified a line or to understand why a change was made.
+- post_line_feedback: Use to post line-level feedback on specific lines of code, including suggestions for improvement.
 - post_summary: Use to post a summary of the review findings, including any haiku or walkthrough.
+
 
 Best practices:
 - Get the pull request details first to understand the context
@@ -61,5 +63,6 @@ Best practices:
 - If you want to suggest a refactor, search for all usages.
 - If you need context about why something is written a certain way, use blame.
 - Use all the tools as needed before writing your review.
-- Once review is complete, post a summary with the findings.`
+- After identifying each issue, immediately call post_line_feedback for it, using the exact lines from the diff.
+- Only proceed to the summary (post_summary) after all line-level feedback is posted.`
 }

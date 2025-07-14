@@ -16,12 +16,13 @@ import (
 
 // AnthropicModel implements the LLM interface using Anthropic's API
 type AnthropicModel struct {
-	client      anthropic.Client
-	modelName   string
-	maxTokens   int
-	apiTimeout  int // in seconds
-	GitProvider *review.Reviewer
-	Settings    *common.Settings
+	client       anthropic.Client
+	modelName    string
+	maxTokens    int
+	apiTimeout   int // in seconds
+	GitProvider  *review.Reviewer
+	Settings     *common.Settings
+	LineFeedback []common.LineLevel
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -91,22 +92,6 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	logger.Debug("Including message in Anthropic prompt")
 	logger.Debug(req.UserPrompt)
 
-	if req.Diff != "" {
-		logger.Debug("Including diff in Anthropic prompt")
-		logger.Debug(req.Diff)
-		userContent = append(userContent, req.Diff)
-	}
-
-	if req.FileContents != "" {
-		logger.Debug("Including file contents in Anthropic prompt")
-		logger.Debug(req.FileContents)
-		userContent = append(userContent, req.FileContents)
-	}
-
-	// if req.LineLevelFeedback != "" {
-	// 	userContent = append(userContent, req.LineLevelFeedback)
-	// }
-
 	// Convert model name string to anthropic.Model
 	var model anthropic.Model
 	switch a.modelName {
@@ -166,4 +151,8 @@ func (a *AnthropicModel) Prompt(req Request) Response {
 	return Response{
 		Content: content,
 	}
+}
+
+func (a *AnthropicModel) GetLineFeedback() []common.LineLevel {
+	return a.LineFeedback
 }

@@ -24,18 +24,19 @@ const (
 	messagesKey      contextKey = "messages"
 	maxToolCallDepth int        = 10
 	ToolUseRequired  string     = "required"
-	ToolUseDAuto     string     = "auto"
+	ToolUseAuto      string     = "auto"
 	ToolUseDisabled  string     = "none"
 )
 
 // OpenAIModel implements the LLM interface using OpenAI's API
 type OpenAIModel struct {
-	client      *openai.Client
-	modelName   string
-	maxTokens   int
-	apiTimeout  int // in seconds
-	GitProvider *review.Reviewer
-	Settings    *common.Settings
+	client       *openai.Client
+	modelName    string
+	maxTokens    int
+	apiTimeout   int // in seconds
+	GitProvider  *review.Reviewer
+	Settings     *common.Settings
+	LineFeedback []common.LineLevel
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -111,7 +112,22 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 	}
 
 	// Create and send the completion request
-	chatReq := o.createChatCompletionRequest(messages, toolChoice)
+	forceSummary := false
+	depth, ok := ctx.Value(toolCallDepthKey).(int)
+	if !ok {
+		depth = 1
+	}
+	if depth == maxToolCallDepth {
+		logger.Warn("Reaching maximum tool call recursion depth, forcing summary")
+		forceSummary = true
+		toolChoice = ToolUseRequired
+	}
+	if depth > maxToolCallDepth {
+		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
+		toolChoice = ToolUseDisabled
+	}
+
+	chatReq := o.createChatCompletionRequest(messages, toolChoice, forceSummary)
 
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
@@ -149,7 +165,13 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 	ctx = context.WithValue(ctx, messagesKey, []openai.ChatCompletionMessage{})
 	ctx = context.WithValue(ctx, toolCallDepthKey, 1)
 
+	o.LineFeedback = []common.LineLevel{}
+
 	return o.promptWithContext(ctx, req, nil, ToolUseRequired)
+}
+
+func (o *OpenAIModel) GetLineFeedback() []common.LineLevel {
+	return o.LineFeedback
 }
 
 // handleToolCalls processes any tool calls in the response and sends follow-up requests if needed
@@ -200,6 +222,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processGetPullRequestDetailsToolCall(tool.Function.Arguments)
 		case "post_summary":
 			result, err = o.processPostSummaryToolCall(tool.Function.Arguments)
+		case "post_line_feedback":
+			result, err = o.processPostLineFeedbackToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -212,11 +236,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	allMessages := append(existingMessages, newMessages...)
 
 	// Create and send follow-up request with tool results
-	toolChoice := ToolUseDAuto
-	if depth > maxToolCallDepth {
-		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
-		toolChoice = ToolUseDisabled
-	}
+	toolChoice := ToolUseAuto
 
 	// Create new context with incremented depth and message history
 	newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
@@ -243,7 +263,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 }
 
 // getTools returns the list of available tools
-func (o *OpenAIModel) getTools() []openai.Tool {
+func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 	// List directory
 	ListDirTool := openai.Tool{
 		Type: openai.ToolTypeFunction,
@@ -504,7 +524,73 @@ func (o *OpenAIModel) getTools() []openai.Tool {
 		},
 	}
 
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool}
+	postLineFeedbackTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "post_line_feedback",
+			Description: "Posts found issues as line-level feedback for a pull request",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"repo_owner": map[string]interface{}{
+						"type":        "string",
+						"description": "The owner of the repository (e.g., 'bitrise-io')",
+					},
+					"repo_name": map[string]interface{}{
+						"type":        "string",
+						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
+					},
+					"pr_number": map[string]interface{}{
+						"type":        "integer",
+						"description": "The pull request number to retrieve details for",
+					},
+					"file": map[string]interface{}{
+						"type":        "string",
+						"description": "The relative path to the file within the repository",
+					},
+					"issue": map[string]interface{}{
+						"type":        "string",
+						"description": "A description of the issue found in the code",
+					},
+					"category": map[string]interface{}{
+						"type":        "string",
+						"description": "The category of the feedback from: bug, refactor, improvement, documentation, nitpick, test coverage, security.",
+					},
+					"line": map[string]interface{}{
+						"type":        "string",
+						"description": "The exact line from the diff hunk that you are commenting on.",
+					},
+					"prompt": map[string]interface{}{
+						"type":        "string",
+						"description": "A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).",
+					},
+					"suggestion": map[string]interface{}{
+						"type":        "string",
+						"description": "An optional suggestion for how to fix the issue. If provided, it should be a complete code snippet that can be applied directly to the file.",
+					},
+				},
+				"required": []string{"repo_owner", "repo_name", "pr_number", "file", "issue", "category", "line", "prompt"},
+				"examples": []map[string]interface{}{
+					{
+						"repo_owner": "bitrise-io",
+						"repo_name":  "bitrise-plugins-ai-reviewer",
+						"pr_number":  42,
+						"file":       "main.go",
+						"issue":      "This line has a potential bug where the variable is not initialized before use.",
+						"category":   "bug",
+						"line":       "\t\tif x > 0 {",
+						"prompt":     "Initialize the variable x before using it to avoid potential runtime errors",
+						"suggestion": "\tx := 0 // Initialize x before use\n\t\tif x > 0 {",
+					},
+				},
+			},
+		},
+	}
+
+	if forceSummary {
+		return []openai.Tool{postSummaryTool}
+	}
+	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -773,11 +859,11 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
 	}
 
-	if args.Summary == "" || args.Walkthrough == "" || args.Haiku == "" {
-		return "", fmt.Errorf("summary, walkthrough and haiku must be provided")
+	if args.Summary == "" {
+		return "", fmt.Errorf("summary must be provided")
 	}
 
-	logger.Infof("🤖 Posting summary: %s")
+	logger.Infof("🤖 Posting summary")
 
 	if o.GitProvider == nil {
 		return "", fmt.Errorf("git provider is not initialized, cannot fetch PR details")
@@ -822,14 +908,59 @@ func (o *OpenAIModel) processPostSummaryToolCall(argumentsJSON string) (string, 
 	return "Summary posted successfully", nil
 }
 
+func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (string, error) {
+	logger.Debug("Processing post line feedback tool call")
+
+	// Parse the arguments JSON
+	var args struct {
+		RepoOwner  string `json:"repo_owner"`
+		RepoName   string `json:"repo_name"`
+		PRNumber   int    `json:"pr_number"`
+		File       string `json:"file"`
+		Issue      string `json:"issue"`
+		Category   string `json:"category"`
+		Line       string `json:"line"`
+		Prompt     string `json:"prompt"`
+		Suggestion string `json:"suggestion,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	// Validate required fields
+	if args.RepoOwner == "" || args.RepoName == "" || args.PRNumber <= 0 {
+		return "", fmt.Errorf("repo_owner, repo_name, and pr_number must be provided")
+	}
+
+	if args.File == "" || args.Line == "" || args.Issue == "" {
+		return "", fmt.Errorf("file, line and issue must be provided")
+	}
+
+	logger.Infof("🤖 Posting line fedback for %s", args.File)
+
+	lineFeedback := common.LineLevel{
+		File:       args.File,
+		Body:       args.Issue,
+		Category:   args.Category,
+		Line:       args.Line,
+		Prompt:     args.Prompt,
+		Suggestion: args.Suggestion,
+	}
+
+	logger.Debugf("line feedback added to queue for file: %s", lineFeedback.File)
+	o.LineFeedback = append(o.LineFeedback, lineFeedback)
+
+	return fmt.Sprintf("Line feedback processed successfully for file %s", lineFeedback.File), nil
+}
+
 // createChatCompletionRequest creates a standard chat completion request with common settings
-func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string) openai.ChatCompletionRequest {
+func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string, forceSummary bool) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
 		Temperature: 0.2,
-		Tools:       o.getTools(),
+		Tools:       o.getTools(forceSummary),
 		ToolChoice:  toolChoice,
 	}
 }

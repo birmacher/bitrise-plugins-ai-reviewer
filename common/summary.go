@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -17,27 +16,6 @@ type Summary struct {
 	Summary     string        `json:"summary"`     // Overall summary of the changes
 	Walkthrough []Walkthrough `json:"walkthrough"` // Detailed walkthrough of individual file changes
 	Haiku       string        `json:"haiku"`       // Haiku celebrating the changes
-}
-
-func ParseSummary(jsonData string) (Summary, error) {
-	summary := Summary{}
-
-	// Encode vialators as the LLM can respond with invalid JSON ( new lines and tabs)
-	jsonData = EncodeLLMKey(jsonData, "content", true)
-	jsonData = EncodeLLMKey(jsonData, "suggestion", true)
-	jsonData = EncodeLLMKey(jsonData, "haiku", false)
-
-	if err := json.Unmarshal([]byte(jsonData), &summary); err != nil {
-		return summary, fmt.Errorf("failed to parse summary JSON: %v", err)
-	}
-
-	haikuStr, err := DecodeLLMValue(summary.Haiku)
-	if err != nil {
-		return summary, fmt.Errorf("failed to decode haiku: %v", err)
-	}
-	summary.Haiku = haikuStr
-
-	return summary, nil
 }
 
 // Header returns the HTML comment that identifies this as a summary from the plugin
