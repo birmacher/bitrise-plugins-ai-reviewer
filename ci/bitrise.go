@@ -166,7 +166,7 @@ func readLogFile(filePath string) (string, error) {
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 
-		if strings.Contains(line, stepHeaderStart()) && strings.Contains(lines[i+2], stepHeaderStart()) {
+		if len(lines) > i+2 && strings.Contains(line, stepHeaderStart()) && strings.Contains(lines[i+2], stepHeaderStart()) {
 			headerStarted = true
 
 			currentStepContent = []string{}
@@ -174,7 +174,7 @@ func readLogFile(filePath string) (string, error) {
 
 		if headerStarted && strings.Contains(line, stepFooterStart()) {
 			// Check if the build has failed
-			if len(lines) >= i+5 && strings.Contains(lines[i+1], "31;1m") && strings.Contains(lines[i+3], "Issue tracker:") {
+			if len(lines) > i+5 && strings.Contains(lines[i+1], "31;1m") && strings.Contains(lines[i+3], "Issue tracker:") {
 				logWithFailingSteps = append(logWithFailingSteps, currentStepContent...)
 				logWithFailingSteps = append(logWithFailingSteps, lines[i:i+5]...)
 
