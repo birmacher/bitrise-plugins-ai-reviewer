@@ -33,6 +33,14 @@ func getToken() (string, error) {
 	return token, nil
 }
 
+func GetAppID() (string, error) {
+	appSlug := os.Getenv("BITRISE_APP_SLUG")
+	if appSlug == "" {
+		return "", fmt.Errorf("BITRISE_APP_SLUG environment variable is not set")
+	}
+	return appSlug, nil
+}
+
 func GetBuildID() (string, error) {
 	buildID := os.Getenv("BITRISE_BUILD_SLUG")
 	if buildID == "" {
@@ -41,12 +49,12 @@ func GetBuildID() (string, error) {
 	return buildID, nil
 }
 
-func GetAppID() (string, error) {
-	appSlug := os.Getenv("BITRISE_APP_SLUG")
-	if appSlug == "" {
-		return "", fmt.Errorf("BITRISE_APP_SLUG environment variable is not set")
+func GetCommitHash() (string, error) {
+	commitHash := os.Getenv("BITRISE_GIT_COMMIT")
+	if commitHash == "" {
+		return "", fmt.Errorf("BITRISE_GIT_COMMIT environment variable is not set")
 	}
-	return appSlug, nil
+	return commitHash, nil
 }
 
 func GetBuildLog() (string, error) {

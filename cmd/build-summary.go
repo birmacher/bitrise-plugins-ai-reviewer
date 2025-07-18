@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/ci"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/llm"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/prompt"
@@ -20,11 +22,31 @@ var buildSummaryCmd = &cobra.Command{
 		settings := parseSettings()
 		logger.Debugf("Using settings: %+v", settings)
 
-		ci, _ := cmd.Flags().GetString("ci")
-		appID, _ := cmd.Flags().GetString("app-id")
-		buildID, _ := cmd.Flags().GetString("build-id")
-		commitHash, _ := cmd.Flags().GetString("commit")
-		logger.Info("CI provider:", ci)
+		var ciProvider string
+		var appID string
+		var buildID string
+		var commitHash string
+
+		_, isBitrise := os.LookupEnv("BITRISE_IO")
+		if isBitrise {
+			ciProvider = "bitrise"
+			var err error
+
+			if appID, err = ci.GetAppID(); err != nil {
+				return err
+			}
+			if buildID, err = ci.GetBuildID(); err != nil {
+				return err
+			}
+			if commitHash, err = ci.GetCommitHash(); err != nil {
+				return err
+			}
+		}
+
+		if ciProvider == "" {
+			return fmt.Errorf("CI provider is not set")
+		}
+		logger.Info("CI provider:", ciProvider)
 
 		// Setup LLM client
 		provider, _ := cmd.Flags().GetString("provider")
@@ -38,7 +60,7 @@ var buildSummaryCmd = &cobra.Command{
 		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(settings, cmd.Use),
-			UserPrompt:   prompt.GetBuildSummaryPrompt(ci, buildID, appID, commitHash),
+			UserPrompt:   prompt.GetBuildSummaryPrompt(ciProvider, buildID, appID, commitHash),
 		}
 
 		// Send the prompt and get the response
@@ -60,10 +82,4 @@ func init() {
 	// LLM
 	buildSummaryCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
 	buildSummaryCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
-	// CI
-	buildSummaryCmd.Flags().StringP("ci", "", "bitrise", "CI provider to use for build summary")
-	buildSummaryCmd.Flags().StringP("app-id", "", "", "App ID for the build")
-	buildSummaryCmd.Flags().StringP("build-id", "", "", "Build ID to summarize")
-	buildSummaryCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
-	buildSummaryCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
 }
