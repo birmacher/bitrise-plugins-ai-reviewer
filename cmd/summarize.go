@@ -114,7 +114,7 @@ var summarizeCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(settings),
+			SystemPrompt: prompt.GetSystemPrompt(settings, cmd.Use),
 			UserPrompt:   prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
 		}
 
@@ -241,8 +241,4 @@ func init() {
 	summarizeCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
 	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
 	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
-}
-
-func parseSettings() common.Settings {
-	return common.WithYamlFile()
 }
