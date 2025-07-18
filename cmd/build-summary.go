@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/llm"
@@ -21,7 +20,7 @@ var buildSummaryCmd = &cobra.Command{
 		settings := parseSettings()
 		logger.Debugf("Using settings: %+v", settings)
 
-		ci, _ := cmd.Flags().GetString("code-review")
+		ci, _ := cmd.Flags().GetString("ci")
 		appID, _ := cmd.Flags().GetString("app-id")
 		buildID, _ := cmd.Flags().GetString("build-id")
 		logger.Info("CI provider:", ci)
@@ -32,9 +31,7 @@ var buildSummaryCmd = &cobra.Command{
 
 		llmClient, err := llm.NewLLM(provider, model)
 		if err != nil {
-			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
-			logger.Errorf(errMsg)
-			return errors.New(errMsg)
+			return fmt.Errorf("failed to create client for provider: %v", err)
 		}
 
 		// Setup the prompt
@@ -46,9 +43,7 @@ var buildSummaryCmd = &cobra.Command{
 		// Send the prompt and get the response
 		resp := llmClient.Prompt(req)
 		if resp.Error != nil {
-			errMsg := fmt.Sprintf("Error getting response from LLM: %v", resp.Error)
-			logger.Errorf(errMsg)
-			return errors.New(errMsg)
+			return fmt.Errorf("error getting response from provider: %v", resp.Error)
 		}
 
 		logger.Debug("LLM Response:")
@@ -66,6 +61,6 @@ func init() {
 	buildSummaryCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
 	// CI
 	buildSummaryCmd.Flags().StringP("ci", "", "bitrise", "CI provider to use for build summary")
-	buildSummaryCmd.Flags().StringP("app-id", "", "", "Build ID to summarize")
+	buildSummaryCmd.Flags().StringP("app-id", "", "", "App ID for the build")
 	buildSummaryCmd.Flags().StringP("build-id", "", "", "Build ID to summarize")
 }

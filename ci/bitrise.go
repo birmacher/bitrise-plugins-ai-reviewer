@@ -29,7 +29,7 @@ func GetBuildLog(token, appSlug, buildSlug string) (string, error) {
 	targetLogMessage := "Found target message. Collecting a few more lines..."
 	interval := 5
 
-	outputFile, err := os.CreateTemp("*", "bitrise.log")
+	outputFile, err := os.CreateTemp("", "bitrise_*.log")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary log file: %w", err)
 	}
