@@ -2,25 +2,26 @@ version: 2
 
 before:
   hooks:
-  - go mod tidy
+    - go mod tidy
 
 builds:
-- env:
-  - CGO_ENABLED=0
-  goos:
-  - linux
-  - darwin
-  goarch:
-  - amd64
-  - arm64
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
 
 archives:
-- formats: [ 'binary' ]
-  name_template: >-
-    {{ .ProjectName }}-
-    {{- .Os }}-
-    {{- if eq .Arch "amd64" }}x86_64
-    {{- else }}{{ .Arch }}{{ end }}
+  - format: binary
+    wrap_in_directory: false
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Os }}-
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
 
 release:
   github:
@@ -31,5 +32,6 @@ release:
 
 checksum:
   name_template: checksums.txt
+
 snapshot:
-  version_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ .Version }}"
