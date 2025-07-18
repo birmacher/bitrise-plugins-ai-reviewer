@@ -8,10 +8,16 @@ func GetBuildSummaryPrompt(provider, buildID, appID, commitHash string) string {
 - **App ID**: ` + appID + `
 - **CI Provider**: ` + provider + `
 - **Commit Hash**: ` + commitHash + `
-### During review
+### Before review
 - get_build_log immediately when starting the review.
+### During review
+- Review the builds logs and the errors in it
+- If you need to look up anything in the code use "search_codebase"
+- If you need to look up code diff changes, use "get_git_diff"
+- If you need additional context about functions, classes, symbols or files, use "read_file" or "get_git_blame"
 ### Finished
-Once the summary and optional suggestion are posted, you should reply with a "done" message, and do not call any more tools.
+- Post the summary and any optional suggestions with post_build_summary.
+- Once summary is posted you should reply with a "done" message, and do not call any more tools.
 ### Guidelines
 - Focus on the build errors, their root causes, and any code, or configuration changes needed to fix them.
 - Avoid additional commentary.

@@ -239,6 +239,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processPostLineFeedbackToolCall(tool.Function.Arguments)
 		case "get_build_logs":
 			result, err = o.processGetBuildLogsToolCall(tool.Function.Arguments)
+		case "post_build_summary":
+			result, err = o.processPostBuildSummaryToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -613,22 +615,36 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 			Name:        "get_build_logs",
 			Description: "Retrieves the build logs for a specific build",
 			Parameters: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+				"required":   []string{},
+				"examples":   []map[string]interface{}{},
+			},
+		},
+	}
+
+	postBuildSummaryTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "post_build_summary",
+			Description: "Posts a summary of the build results",
+			Parameters: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"app": map[string]interface{}{
+					"summary": map[string]interface{}{
 						"type":        "string",
-						"description": "The unique identifier for the app whose build logs you want to retrieve",
+						"description": "A summary of the build results, including success/failure status and any relevant details",
 					},
-					"build": map[string]interface{}{
+					"suggestion": map[string]interface{}{
 						"type":        "string",
-						"description": "The unique identifier for the build whose logs you want to retrieve",
+						"description": "An optional suggestion for how to improve the build process or fix any issues",
 					},
 				},
-				"required": []string{"app", "build"},
+				"required": []string{"summary"},
 				"examples": []map[string]interface{}{
 					{
-						"app":   "9876543210abcdef",
-						"build": "1234567890abcdef",
+						"summary":    "Build completed successfully with no errors.",
+						"suggestion": "Consider adding more unit tests to improve code coverage.",
 					},
 				},
 			},
@@ -638,7 +654,7 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 	if forceSummary {
 		return []openai.Tool{postSummaryTool}
 	}
-	return []openai.Tool{ListDirTool, getBuildLogsTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
+	return []openai.Tool{ListDirTool, getBuildLogsTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool, postBuildSummaryTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -986,27 +1002,39 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 }
 
 func (o *OpenAIModel) processGetBuildLogsToolCall(argumentsJSON string) (string, error) {
+	logger.Infof("🤖 Getting build logs")
+
+	logs, err := ci.GetBuildLog()
+	if err != nil {
+		return "", fmt.Errorf("failed to get build logs: %v", err)
+	}
+
+	return logs, nil
+}
+
+func (o *OpenAIModel) processPostBuildSummaryToolCall(argumentsJSON string) (string, error) {
 	var args struct {
-		App   string `json:"app"`
-		Build string `json:"build"`
+		Build      string `json:"build"`
+		Summary    string `json:"summary"`
+		Suggestion string `json:"suggestion,omitempty"`
 	}
 
 	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
 		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
 	}
 
-	logger.Infof("🤖 Getting build logs for app: %s, build: %s", args.App, args.Build)
+	logger.Infof("🤖 Posting build summary for build: %s", args.Build)
 
-	if args.App == "" || args.Build == "" {
-		return "", fmt.Errorf("app and build must be provided")
+	if args.Summary == "" {
+		return "", fmt.Errorf("summary must be provided")
 	}
 
-	logs, err := ci.GetBuildLog(args.App, args.Build)
+	err := ci.PostBuildSummary(args.Summary, args.Suggestion)
 	if err != nil {
-		return "", fmt.Errorf("failed to get build logs: %v", err)
+		return "", fmt.Errorf("failed to post build summary: %v", err)
 	}
 
-	return logs, nil
+	return "Build summary posted successfully", nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings

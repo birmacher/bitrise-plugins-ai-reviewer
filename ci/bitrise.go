@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
 )
 
 type BitriseLogResponse struct {
@@ -31,18 +33,44 @@ func getToken() (string, error) {
 	return token, nil
 }
 
-func GetBuildLog(appSlug, buildSlug string) (string, error) {
+func GetBuildID() (string, error) {
+	buildID := os.Getenv("BITRISE_BUILD_SLUG")
+	if buildID == "" {
+		return "", fmt.Errorf("BITRISE_BUILD_SLUG environment variable is not set")
+	}
+	return buildID, nil
+}
+
+func GetAppID() (string, error) {
+	appSlug := os.Getenv("BITRISE_APP_SLUG")
+	if appSlug == "" {
+		return "", fmt.Errorf("BITRISE_APP_SLUG environment variable is not set")
+	}
+	return appSlug, nil
+}
+
+func GetBuildLog() (string, error) {
 	position := 0
 	isFinished := false
 	foundTargetMessage := false
-	targetLogMessage := "Found target message. Collecting a few more lines..."
+	targetLogMessage := "Running AI build summary..."
 	interval := 5
+
+	appSlug, err := GetAppID()
+	if err != nil {
+		return "", fmt.Errorf("failed to get app ID: %w", err)
+	}
+	buildSlug, err := GetBuildID()
+	if err != nil {
+		return "", fmt.Errorf("failed to get build ID: %w", err)
+	}
 
 	outputFile, err := os.CreateTemp("", "bitrise_*.log")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary log file: %w", err)
 	}
 	defer outputFile.Close()
+	defer os.Remove(outputFile.Name())
 
 	for {
 		logResponse, err := fetchLogChunk(appSlug, buildSlug, position)
@@ -87,12 +115,11 @@ func GetBuildLog(appSlug, buildSlug string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read log file: %w", err)
 	}
-	os.Remove(outputFile.Name())
 
 	return redactedLogs, nil
 }
 
-func PostBuildSummary(buildSlug, summary, suggestion string) error {
+func PostBuildSummary(summary, suggestion string) error {
 	if err := installAnnotationPlugin(); err != nil {
 		return err
 	}
@@ -109,17 +136,14 @@ func PostBuildSummary(buildSlug, summary, suggestion string) error {
 ` + suggestion
 	}
 
-	token, err := getToken()
-	if err != nil {
-		return fmt.Errorf("failed to get Bitrise token: %w", err)
-	}
+	cmd := exec.Command("bitrise", ":annotations", "annotate", body, "--style", "info", "--context", "ai-summary")
 
-	cmd := exec.Command("bitrise", "plugins", ":annotations", "annotate", body, "--style", "info", "--context", "ai-summary")
-	cmd.Env = append(os.Environ(),
-		"BITRISEIO_BITRISE_SERVICES_ACCESS_TOKEN="+token,
-		"BITRISE_BUILD_SLUG="+buildSlug)
+	var output strings.Builder
+	cmd.Stdout = &output
+	cmd.Stderr = &output
 
 	if err := cmd.Run(); err != nil {
+		logger.Debug("Annotations failed:", output.String())
 		return fmt.Errorf("failed to post build summary: %w", err)
 	}
 
@@ -232,18 +256,14 @@ func readLogFile(filePath string) (string, error) {
 				i += 5
 			} else {
 				// Header
-				headerLen := 9
-				if len(currentStepContent) < 9 {
-					headerLen = len(currentStepContent)
-				}
-
+				headerLen := min(len(currentStepContent), 9)
 				footerLen := 3
 				if len(lines) < i+3 {
 					footerLen = len(lines) - i
 				}
 				logWithFailingSteps = append(logWithFailingSteps, currentStepContent[0:headerLen]...)
 				logWithFailingSteps = append(logWithFailingSteps, "[successful step log truncated]")
-				logWithFailingSteps = append(logWithFailingSteps, lines[i:footerLen]...)
+				logWithFailingSteps = append(logWithFailingSteps, lines[i:i+footerLen]...)
 
 				// Skipping footer lines
 				i += footerLen
