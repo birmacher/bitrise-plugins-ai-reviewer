@@ -52,7 +52,15 @@ var buildSummaryCmd = &cobra.Command{
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		llmClient, err := llm.NewLLM(provider, model)
+		llmClient, err := llm.NewLLM(provider, model, llm.WithEnabledTools(llm.EnabledTools{
+			ListDirectory:    true,
+			GetGitDiff:       true,
+			ReadFile:         true,
+			SearchCodebase:   true,
+			GetGitBlame:      true,
+			GetBuildLog:      true,
+			PostBuildSummary: true,
+		}))
 		if err != nil {
 			return fmt.Errorf("failed to create client for provider: %v", err)
 		}

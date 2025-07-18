@@ -39,6 +39,7 @@ type OpenAIModel struct {
 	GitProvider  *review.Reviewer
 	Settings     *common.Settings
 	LineFeedback []common.LineLevel
+	EnabledTools EnabledTools
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -80,6 +81,10 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 		case APITimeoutOption:
 			if timeout, ok := opt.Value.(int); ok {
 				model.apiTimeout = timeout
+			}
+		case EnabledToolsOption:
+			if enabledTools, ok := opt.Value.(EnabledTools); ok {
+				model.EnabledTools = enabledTools
 			}
 		}
 	}
@@ -651,10 +656,46 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 		},
 	}
 
-	if forceSummary {
-		return []openai.Tool{postSummaryTool}
+	requiredTools := []openai.Tool{}
+	if o.EnabledTools.PostSummary {
+		requiredTools = append(requiredTools, postSummaryTool)
 	}
-	return []openai.Tool{ListDirTool, getBuildLogsTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool, postBuildSummaryTool}
+	if o.EnabledTools.PostBuildSummary {
+		requiredTools = append(requiredTools, postBuildSummaryTool)
+	}
+
+	optionalTools := []openai.Tool{}
+	if o.EnabledTools.ListDirectory {
+		optionalTools = append(optionalTools, ListDirTool)
+	}
+	if o.EnabledTools.GetGitDiff {
+		optionalTools = append(optionalTools, gitDiffTool)
+	}
+	if o.EnabledTools.ReadFile {
+		optionalTools = append(optionalTools, readFileTool)
+	}
+	if o.EnabledTools.SearchCodebase {
+		optionalTools = append(optionalTools, searchCodebaseTool)
+	}
+	if o.EnabledTools.GetGitBlame {
+		optionalTools = append(optionalTools, gitBlameTool)
+	}
+	if o.EnabledTools.GetPullRequestDetails {
+		optionalTools = append(optionalTools, getPullRequestDetailsTool)
+	}
+	if o.EnabledTools.GetBuildLog {
+		optionalTools = append(optionalTools, getBuildLogsTool)
+	}
+	if o.EnabledTools.PostLineFeedback {
+		optionalTools = append(optionalTools, postLineFeedbackTool)
+	}
+
+	if forceSummary {
+		return requiredTools
+	}
+
+	optionalTools = append(optionalTools, requiredTools...)
+	return optionalTools
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
