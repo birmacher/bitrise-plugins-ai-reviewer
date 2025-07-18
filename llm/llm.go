@@ -20,9 +20,10 @@ type OptionType string
 
 // Available option types
 const (
-	ModelNameOption  OptionType = "model"
-	MaxTokensOption  OptionType = "max_tokens"
-	APITimeoutOption OptionType = "api_timeout"
+	ModelNameOption    OptionType = "model"
+	MaxTokensOption    OptionType = "max_tokens"
+	APITimeoutOption   OptionType = "api_timeout"
+	EnabledToolsOption OptionType = "enabled_tools"
 )
 
 // Option represents a generic configuration option for any LLM provider
@@ -52,6 +53,13 @@ func WithAPITimeout(timeout int) Option {
 	return Option{
 		Type:  APITimeoutOption,
 		Value: timeout,
+	}
+}
+
+func WithEnabledTools(enabledTools EnabledTools) Option {
+	return Option{
+		Type:  EnabledToolsOption,
+		Value: enabledTools,
 	}
 }
 

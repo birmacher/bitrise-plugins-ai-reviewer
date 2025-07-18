@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/ci"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
@@ -38,6 +39,7 @@ type OpenAIModel struct {
 	GitProvider  *review.Reviewer
 	Settings     *common.Settings
 	LineFeedback []common.LineLevel
+	EnabledTools EnabledTools
 }
 
 // NewOpenAI creates a new OpenAI client
@@ -79,6 +81,10 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 		case APITimeoutOption:
 			if timeout, ok := opt.Value.(int); ok {
 				model.apiTimeout = timeout
+			}
+		case EnabledToolsOption:
+			if enabledTools, ok := opt.Value.(EnabledTools); ok {
+				model.EnabledTools = enabledTools
 			}
 		}
 	}
@@ -236,6 +242,10 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processPostSummaryToolCall(tool.Function.Arguments)
 		case "post_line_feedback":
 			result, err = o.processPostLineFeedbackToolCall(tool.Function.Arguments)
+		case "get_build_logs":
+			result, err = o.processGetBuildLogsToolCall(tool.Function.Arguments)
+		case "post_build_summary":
+			result, err = o.processPostBuildSummaryToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -604,10 +614,88 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 		},
 	}
 
-	if forceSummary {
-		return []openai.Tool{postSummaryTool}
+	getBuildLogsTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_build_logs",
+			Description: "Retrieves the build logs for a specific build",
+			Parameters: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+				"required":   []string{},
+				"examples":   []map[string]interface{}{},
+			},
+		},
 	}
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
+
+	postBuildSummaryTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "post_build_summary",
+			Description: "Posts a summary of the build results",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"summary": map[string]interface{}{
+						"type":        "string",
+						"description": "A summary of the build results, including success/failure status and any relevant details",
+					},
+					"suggestion": map[string]interface{}{
+						"type":        "string",
+						"description": "An optional suggestion for how to improve the build process or fix any issues",
+					},
+				},
+				"required": []string{"summary"},
+				"examples": []map[string]interface{}{
+					{
+						"summary":    "Build completed successfully with no errors.",
+						"suggestion": "Consider adding more unit tests to improve code coverage.",
+					},
+				},
+			},
+		},
+	}
+
+	requiredTools := []openai.Tool{}
+	if o.EnabledTools.PostSummary {
+		requiredTools = append(requiredTools, postSummaryTool)
+	}
+	if o.EnabledTools.PostBuildSummary {
+		requiredTools = append(requiredTools, postBuildSummaryTool)
+	}
+
+	optionalTools := []openai.Tool{}
+	if o.EnabledTools.ListDirectory {
+		optionalTools = append(optionalTools, ListDirTool)
+	}
+	if o.EnabledTools.GetGitDiff {
+		optionalTools = append(optionalTools, gitDiffTool)
+	}
+	if o.EnabledTools.ReadFile {
+		optionalTools = append(optionalTools, readFileTool)
+	}
+	if o.EnabledTools.SearchCodebase {
+		optionalTools = append(optionalTools, searchCodebaseTool)
+	}
+	if o.EnabledTools.GetGitBlame {
+		optionalTools = append(optionalTools, gitBlameTool)
+	}
+	if o.EnabledTools.GetPullRequestDetails {
+		optionalTools = append(optionalTools, getPullRequestDetailsTool)
+	}
+	if o.EnabledTools.GetBuildLog {
+		optionalTools = append(optionalTools, getBuildLogsTool)
+	}
+	if o.EnabledTools.PostLineFeedback {
+		optionalTools = append(optionalTools, postLineFeedbackTool)
+	}
+
+	if forceSummary {
+		return requiredTools
+	}
+
+	optionalTools = append(optionalTools, requiredTools...)
+	return optionalTools
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -952,6 +1040,42 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 	o.LineFeedback = append(o.LineFeedback, lineFeedback)
 
 	return fmt.Sprintf("Line feedback processed successfully for file %s", lineFeedback.File), nil
+}
+
+func (o *OpenAIModel) processGetBuildLogsToolCall(argumentsJSON string) (string, error) {
+	logger.Infof("🤖 Getting build logs")
+
+	logs, err := ci.GetBuildLog()
+	if err != nil {
+		return "", fmt.Errorf("failed to get build logs: %v", err)
+	}
+
+	return logs, nil
+}
+
+func (o *OpenAIModel) processPostBuildSummaryToolCall(argumentsJSON string) (string, error) {
+	var args struct {
+		Build      string `json:"build"`
+		Summary    string `json:"summary"`
+		Suggestion string `json:"suggestion,omitempty"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	logger.Infof("🤖 Posting build summary for build: %s", args.Build)
+
+	if args.Summary == "" {
+		return "", fmt.Errorf("summary must be provided")
+	}
+
+	err := ci.PostBuildSummary(args.Summary, args.Suggestion)
+	if err != nil {
+		return "", fmt.Errorf("failed to post build summary: %v", err)
+	}
+
+	return "Build summary posted successfully", nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings

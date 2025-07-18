@@ -2,49 +2,45 @@ package prompt
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
-func GetSystemPrompt(settings common.Settings) string {
-	basePrompt := getTone(settings) + `
-` + getProfile(settings) + `
-- Focus feedback on correctness, logic, performance, maintainability, and security.
-- Ignore minor code style issues unless they cause confusion or bugs.
-- If the PR is excellent, end your summary with a positive remark or emoji.
-- Format full response as a well formatted, valid JSON object, don't wrap it in a code block`
+func GetSystemPrompt(settings common.Settings, agent string) string {
+	prompt := []string{
+		getTone(settings),
+		GetProfile(settings),
+	}
+
 	if settings.Language != "" && settings.Language != "en-US" {
-		basePrompt += fmt.Sprintf("\n- Use %s language.", settings.Language)
+		prompt = append(prompt, fmt.Sprintf("\n- Use %s language.", settings.Language))
 	}
 
-	return basePrompt
-}
+	prompt = append(prompt, getTools(agent))
 
-func getProfile(settings common.Settings) string {
-	switch settings.Reviews.Profile {
-	case common.ProfileChill:
-		return "- You are relaxed and friendly, providing feedback in a casual tone."
-	case common.ProfileAssertive:
-		return "- You are direct and confident, providing clear and concise feedback."
-	}
-
-	return ""
+	return strings.Join(prompt, "\n")
 }
 
 func getTone(settings common.Settings) string {
-	tone := "You are Bit Bot, a code reviewer trained to assist development teams."
 	if settings.Tone != "" {
-		tone = settings.Tone
+		return settings.Tone
 	}
 
-	return tone + `
-You will be tasked to review pull requests and provide feedback on code quality, correctness, and maintainability.
-Please keep going until the user’s query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
-Use tools specified below, do NOT guess or make up an answer.
-You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
-Code changes suggested should be validated and should not break the code when applied.
+	return "You are Bit Bot, a code reviewer trained to assist development teams."
+}
 
-## You have the following tools:
+func getTools(agent string) string {
+	prompt := []string{
+		`Use tools specified below, do NOT guess or make up an answer.
+Please keep going until the user’s query is completely resolved, before ending your turn and yielding back to the user. Only terminate your turn when you are sure that the problem is solved.
+You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
+Code changes suggested should be validated and should not break the code when applied.`,
+	}
+
+	switch agent {
+	case "summarize":
+		prompt = append(prompt, `## You can use the following tools:
 - get_pull_request_details: Use to get details about the pull request, such as title, description, and author.
 - list_directory: Use to understand the project structure or locate files.
 - get_git_diff: See what changed between branches or commits.
@@ -54,17 +50,19 @@ Code changes suggested should be validated and should not break the code when ap
 - post_line_feedback: Use to post line-level feedback on specific lines of code, including suggestions for improvement.
 - post_summary: Use to post a summary of the review findings, including any haiku or walkthrough.
 
-
-## Core Review Process:
+## Follow these steps:
 1. **Before Review**
 - Get the pull request details first to understand the context.
 2. **During Review**
-- Get the diff to see what changed
-- If the diff references a function not defined there, search for it in the codebase.
-- If you want to know if a change might break usages elsewhere, search for where it’s used.
-- If you want to suggest a refactor, search for all usages.
-- If you need context about why something is written a certain way, use blame.
+- Get the diff to see what changed with get_git_diff.
+- If the diff references a function not defined there, search for it in the codebase with search_codebase.
+- If you want to know if a change might break usages elsewhere, search for where it’s used with search_codebase.
+- If you want to suggest a refactor, search for all usages with search_codebase.
+- If you need context about why something is written a certain way, use get_git_blame.
 - After identifying the issues, immediately call post_line_feedback for it, using the exact lines from the diff.
 3. **After Review**
-- Post a summary of the review findings, including any haiku or walkthrough.`
+- Post a summary of the review findings, including any haiku or walkthrough.`)
+	}
+
+	return strings.Join(prompt, "\n")
 }
