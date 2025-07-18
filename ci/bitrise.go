@@ -52,7 +52,8 @@ func GetBuildID() (string, error) {
 func GetCommitHash() (string, error) {
 	commitHash := os.Getenv("BITRISE_GIT_COMMIT")
 	if commitHash == "" {
-		return "", fmt.Errorf("BITRISE_GIT_COMMIT environment variable is not set")
+		logger.Warn("BITRISE_GIT_COMMIT environment variable is not set, using HEAD commit hash")
+		commitHash = "HEAD"
 	}
 	return commitHash, nil
 }
