@@ -174,7 +174,7 @@ func readLogFile(filePath string) (string, error) {
 
 		if headerStarted && strings.Contains(line, stepFooterStart()) {
 			// Check if the build has failed
-			if strings.Contains(lines[i+1], "31;1m") && strings.Contains(lines[i+3], "Issue tracker:") {
+			if len(lines) >= i+5 && strings.Contains(lines[i+1], "31;1m") && strings.Contains(lines[i+3], "Issue tracker:") {
 				logWithFailingSteps = append(logWithFailingSteps, currentStepContent...)
 				logWithFailingSteps = append(logWithFailingSteps, lines[i:i+5]...)
 
@@ -182,12 +182,21 @@ func readLogFile(filePath string) (string, error) {
 				i += 5
 			} else {
 				// Header
-				logWithFailingSteps = append(logWithFailingSteps, currentStepContent[0:9]...)
-				logWithFailingSteps = append(logWithFailingSteps, "[successful step log truncated]")
-				logWithFailingSteps = append(logWithFailingSteps, lines[i:i+3]...)
+				headerLen := 9
+				if len(currentStepContent) < 9 {
+					headerLen = len(currentStepContent)
+				}
 
-				// Skipping foother lines
-				i += 3
+				footerLen := 3
+				if len(lines) < i+3 {
+					footerLen = len(lines) - i
+				}
+				logWithFailingSteps = append(logWithFailingSteps, currentStepContent[0:headerLen]...)
+				logWithFailingSteps = append(logWithFailingSteps, "[successful step log truncated]")
+				logWithFailingSteps = append(logWithFailingSteps, lines[i:footerLen]...)
+
+				// Skipping footer lines
+				i += footerLen
 			}
 
 			headerStarted = false
