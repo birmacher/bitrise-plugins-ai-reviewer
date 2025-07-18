@@ -22,7 +22,15 @@ type LogChunk struct {
 	Position int    `json:"position"`
 }
 
-func GetBuildLog(token, appSlug, buildSlug string) (string, error) {
+func getToken() (string, error) {
+	token := os.Getenv("BITRISE_TOKEN")
+	if token == "" {
+		return "", fmt.Errorf("BITRISE_TOKEN environment variable is not set")
+	}
+	return token, nil
+}
+
+func GetBuildLog(appSlug, buildSlug string) (string, error) {
 	position := 0
 	isFinished := false
 	foundTargetMessage := false
@@ -36,7 +44,7 @@ func GetBuildLog(token, appSlug, buildSlug string) (string, error) {
 	defer outputFile.Close()
 
 	for {
-		logResponse, err := fetchLogChunk(token, appSlug, buildSlug, position)
+		logResponse, err := fetchLogChunk(appSlug, buildSlug, position)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error fetching logs: %v\n", err)
 			os.Exit(1)
@@ -74,10 +82,16 @@ func GetBuildLog(token, appSlug, buildSlug string) (string, error) {
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
 
-	return outputFile.Name(), nil
+	redactedLogs, err := readLogFile(outputFile.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to read log file: %w", err)
+	}
+	os.Remove(outputFile.Name())
+
+	return redactedLogs, nil
 }
 
-func fetchLogChunk(token, appSlug, buildSlug string, position int) (BitriseLogResponse, error) {
+func fetchLogChunk(appSlug, buildSlug string, position int) (BitriseLogResponse, error) {
 	url := fmt.Sprintf("https://api.bitrise.io/v0.1/apps/%s/builds/%s/log", appSlug, buildSlug)
 
 	// Add position parameter if not starting from the beginning
@@ -91,6 +105,10 @@ func fetchLogChunk(token, appSlug, buildSlug string, position int) (BitriseLogRe
 	}
 
 	// Add authorization header
+	token, err := getToken()
+	if err != nil {
+		return BitriseLogResponse{}, err
+	}
 	req.Header.Add("Authorization", "token "+token)
 
 	// Make the request
@@ -132,4 +150,66 @@ func appendChunksToFile(filePath string, chunks []string) error {
 	}
 
 	return nil
+}
+
+func readLogFile(filePath string) (string, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read log file: %w", err)
+	}
+
+	logWithFailingSteps := []string{}
+	currentStepContent := []string{}
+	headerStarted := false
+
+	lines := strings.Split(string(content), "\n")
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+
+		if strings.Contains(line, stepHeaderStart()) && strings.Contains(lines[i+2], stepHeaderStart()) {
+			headerStarted = true
+
+			currentStepContent = []string{}
+		}
+
+		if headerStarted && strings.Contains(line, stepFooterStart()) {
+			// Check if the build has failed
+			if strings.Contains(lines[i+1], "31;1m") && strings.Contains(lines[i+3], "Issue tracker:") {
+				logWithFailingSteps = append(logWithFailingSteps, currentStepContent...)
+				logWithFailingSteps = append(logWithFailingSteps, lines[i:i+5]...)
+
+				// Skipping the footer
+				i += 5
+			} else {
+				// Header
+				logWithFailingSteps = append(logWithFailingSteps, currentStepContent[0:9]...)
+				logWithFailingSteps = append(logWithFailingSteps, "[successful step log truncated]")
+				logWithFailingSteps = append(logWithFailingSteps, lines[i:i+3]...)
+
+				// Skipping foother lines
+				i += 3
+			}
+
+			headerStarted = false
+		}
+
+		// If we are not in a step, add the lines
+		if !headerStarted {
+			logWithFailingSteps = append(logWithFailingSteps, line)
+		}
+
+		if headerStarted {
+			currentStepContent = append(currentStepContent, line)
+		}
+	}
+
+	return strings.Join(logWithFailingSteps, "\n"), nil
+}
+
+func stepHeaderStart() string {
+	return "+------------------------------------------------------------------------------+"
+}
+
+func stepFooterStart() string {
+	return `+---+---------------------------------------------------------------+----------+`
 }

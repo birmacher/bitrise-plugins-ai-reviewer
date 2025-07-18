@@ -23,6 +23,7 @@ var buildSummaryCmd = &cobra.Command{
 		ci, _ := cmd.Flags().GetString("ci")
 		appID, _ := cmd.Flags().GetString("app-id")
 		buildID, _ := cmd.Flags().GetString("build-id")
+		commitHash, _ := cmd.Flags().GetString("commit")
 		logger.Info("CI provider:", ci)
 
 		// Setup LLM client
@@ -37,7 +38,7 @@ var buildSummaryCmd = &cobra.Command{
 		// Setup the prompt
 		req := llm.Request{
 			SystemPrompt: prompt.GetSystemPrompt(settings, cmd.Use),
-			UserPrompt:   prompt.GetBuildSummaryPrompt(buildID, appID),
+			UserPrompt:   prompt.GetBuildSummaryPrompt(ci, buildID, appID, commitHash),
 		}
 
 		// Send the prompt and get the response
@@ -63,4 +64,6 @@ func init() {
 	buildSummaryCmd.Flags().StringP("ci", "", "bitrise", "CI provider to use for build summary")
 	buildSummaryCmd.Flags().StringP("app-id", "", "", "App ID for the build")
 	buildSummaryCmd.Flags().StringP("build-id", "", "", "Build ID to summarize")
+	buildSummaryCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
+	buildSummaryCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/ci"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/git"
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/logger"
@@ -236,6 +237,8 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 			result, err = o.processPostSummaryToolCall(tool.Function.Arguments)
 		case "post_line_feedback":
 			result, err = o.processPostLineFeedbackToolCall(tool.Function.Arguments)
+		case "get_build_logs":
+			result, err = o.processGetBuildLogsToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
 		}
@@ -604,10 +607,38 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 		},
 	}
 
+	getBuildLogsTool := openai.Tool{
+		Type: openai.ToolTypeFunction,
+		Function: &openai.FunctionDefinition{
+			Name:        "get_build_logs",
+			Description: "Retrieves the build logs for a specific build",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"app": map[string]interface{}{
+						"type":        "string",
+						"description": "The unique identifier for the app whose build logs you want to retrieve",
+					},
+					"build": map[string]interface{}{
+						"type":        "string",
+						"description": "The unique identifier for the build whose logs you want to retrieve",
+					},
+				},
+				"required": []string{"app", "build"},
+				"examples": []map[string]interface{}{
+					{
+						"app":   "9876543210abcdef",
+						"build": "1234567890abcdef",
+					},
+				},
+			},
+		},
+	}
+
 	if forceSummary {
 		return []openai.Tool{postSummaryTool}
 	}
-	return []openai.Tool{ListDirTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
+	return []openai.Tool{ListDirTool, getBuildLogsTool, gitDiffTool, readFileTool, searchCodebaseTool, gitBlameTool, getPullRequestDetailsTool, postSummaryTool, postLineFeedbackTool}
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -952,6 +983,30 @@ func (o *OpenAIModel) processPostLineFeedbackToolCall(argumentsJSON string) (str
 	o.LineFeedback = append(o.LineFeedback, lineFeedback)
 
 	return fmt.Sprintf("Line feedback processed successfully for file %s", lineFeedback.File), nil
+}
+
+func (o *OpenAIModel) processGetBuildLogsToolCall(argumentsJSON string) (string, error) {
+	var args struct {
+		App   string `json:"app"`
+		Build string `json:"build"`
+	}
+
+	if err := json.Unmarshal([]byte(argumentsJSON), &args); err != nil {
+		return "", fmt.Errorf("failed to parse tool arguments: %v", err)
+	}
+
+	logger.Infof("🤖 Getting build logs for app: %s, build: %s", args.App, args.Build)
+
+	if args.App == "" || args.Build == "" {
+		return "", fmt.Errorf("app and build must be provided")
+	}
+
+	logs, err := ci.GetBuildLog(args.App, args.Build)
+	if err != nil {
+		return "", fmt.Errorf("failed to get build logs: %v", err)
+	}
+
+	return logs, nil
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
