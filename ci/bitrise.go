@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -89,6 +90,55 @@ func GetBuildLog(appSlug, buildSlug string) (string, error) {
 	os.Remove(outputFile.Name())
 
 	return redactedLogs, nil
+}
+
+func PostBuildSummary(buildSlug, summary, suggestion string) error {
+	if err := installAnnotationPlugin(); err != nil {
+		return err
+	}
+
+	body := `## AI Build Summary
+
+### Error details
+` + summary
+
+	if len(suggestion) > 0 {
+		body += `
+		
+### Suggested fix
+` + suggestion
+	}
+
+	token, err := getToken()
+	if err != nil {
+		return fmt.Errorf("failed to get Bitrise token: %w", err)
+	}
+
+	cmd := exec.Command("bitrise", "plugins", ":annotations", "annotate", body, "--style", "info", "--context", "ai-summary")
+	cmd.Env = append(os.Environ(),
+		"BITRISEIO_BITRISE_SERVICES_ACCESS_TOKEN="+token,
+		"BITRISE_BUILD_SLUG="+buildSlug)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to post build summary: %w", err)
+	}
+
+	return nil
+}
+
+func installAnnotationPlugin() error {
+	// Try to list the annotation plugin
+	cmd := exec.Command("bitrise", "plugins", ":annotations")
+	if err := cmd.Run(); err != nil {
+		// If not found, install it
+		installCmd := exec.Command("bitrise", "plugin", "install", "https://github.com/bitrise-io/bitrise-plugins-annotations.git")
+		installCmd.Stdout = os.Stdout
+		installCmd.Stderr = os.Stderr
+		if err := installCmd.Run(); err != nil {
+			return fmt.Errorf("failed to install annotations plugin: %w", err)
+		}
+	}
+	return nil
 }
 
 func fetchLogChunk(appSlug, buildSlug string, position int) (BitriseLogResponse, error) {
