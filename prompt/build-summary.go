@@ -25,8 +25,11 @@ func GetBuildSummaryPrompt(provider, buildID, appID, commitHash string) string {
 - If you want to know if a change might break usages elsewhere, search for where it’s used with search_codebase.
 - If you want to suggest a refactor, search for all usages with search_codebase.
 - If you need context about why something is written a certain way, use get_git_blame.
-### Finished
-- You **must** finish the review by posting a short, clear summary of the findings with "post_build_summary"
+### After Review
+- Once you have identified the issues, immediately call "post_build_summary" for it. Summary should be short, clear and concise. Include the error details and any code or configuration changes needed to fix them.
+- If you have a suggestion to fix the issue, add it as well.
+### Finishing
+- Respond back with a "done" message to indicate that the review is complete.
 ### Guidelines
 - Focus on the build errors, their root causes, and any code, or configuration changes needed to fix them.
 - Avoid additional commentary.
