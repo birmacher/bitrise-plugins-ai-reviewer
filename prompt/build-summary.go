@@ -14,7 +14,7 @@ func GetBuildSummaryPrompt(provider, buildID, appID, commitHash string) string {
 - read_file: Use to read any file if additional context is needed.
 - search_codebase: Use if a function, class, or symbol appears in the diff and you want to know where else it is used or defined.
 - get_git_blame: Use to see who last modified a line or to understand why a change was made.
-- post_build_summary: Use to post the summary of the build errors and optional suggestion to fix the issue.
+- post_build_summary: (mandatory, last tool) post the summary of the CI build errors and a step by step suggestion on fixing the issue.
 ## Review Process
 ### Before review
 - You **must** have to get the build logs to understand the context and the error with "get_build_log"

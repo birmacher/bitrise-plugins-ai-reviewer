@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,9 +26,6 @@ const (
 	toolCallDepthKey contextKey = "toolCallDepth"
 	messagesKey      contextKey = "messages"
 	maxToolCallDepth int        = 10
-	ToolUseRequired  string     = "required"
-	ToolUseAuto      string     = "auto"
-	ToolUseDisabled  string     = "none"
 )
 
 // OpenAIModel implements the LLM interface using OpenAI's API
@@ -100,7 +98,7 @@ func (o *OpenAIModel) SetSettings(settings *common.Settings) {
 	o.Settings = settings
 }
 
-func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage, toolChoice string) Response {
+func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMessages []openai.ChatCompletionMessage) Response {
 	// Create base messages with system and user prompts
 	messages := []openai.ChatCompletionMessage{
 		{
@@ -119,27 +117,31 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 	}
 
 	// Create and send the completion request
-	forceSummary := false
 	depth, ok := ctx.Value(toolCallDepthKey).(int)
 	if !ok {
 		depth = 1
 	}
+	if depth == 1 {
+		// todo initializer tool calls
+	}
+
 	if depth == maxToolCallDepth {
 		logger.Warn("Reaching maximum tool call recursion depth, forcing summary")
-		forceSummary = true
-		toolChoice = ToolUseRequired
 	}
 	if depth > maxToolCallDepth {
 		logger.Warn("Maximum tool call recursion depth reached, stopping further tool calls")
-		toolChoice = ToolUseDisabled
+		// todo finalizer
 	}
 
-	chatReq := o.createChatCompletionRequest(messages, toolChoice, forceSummary)
+	chatReq := o.createChatCompletionRequest(messages, depth)
 
 	logger.Infof("Sending request to OpenAI with model %s, max tokens %d, tools enabled: %v",
 		o.modelName, o.maxTokens, len(chatReq.Tools) > 0)
-	logger.Debug("System prompt: " + req.SystemPrompt)
-	logger.Debug("User prompt: " + req.UserPrompt)
+
+	// Debug log the messages being sent
+	for _, message := range messages {
+		logger.Debug("[" + message.Role + " prompt]:\n" + message.Content)
+	}
 
 	resp, err := o.client.CreateChatCompletion(ctx, chatReq)
 	if err != nil {
@@ -152,6 +154,7 @@ func (o *OpenAIModel) promptWithContext(ctx context.Context, req Request, toolMe
 
 	// Check for tool calls in the response and handle them if present
 	if len(resp.Choices[0].Message.ToolCalls) > 0 {
+		// todo: if tool called is finalizer, finish the process
 		logger.Debug("Tool call detected in response")
 		return o.handleToolCalls(ctx, resp, req)
 	}
@@ -179,7 +182,7 @@ func (o *OpenAIModel) Prompt(req Request) Response {
 
 	o.LineFeedback = []common.LineLevel{}
 
-	return o.promptWithContext(ctx, req, nil, ToolUseRequired)
+	return o.promptWithContext(ctx, req, nil)
 }
 
 func (o *OpenAIModel) GetLineFeedback() []common.LineLevel {
@@ -204,20 +207,17 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 	// Log and process all tool calls
 	toolCalls := resp.Choices[0].Message.ToolCalls
 
-	// First, collect all new messages from this tool call sequence
-	// Ensure content is never null as OpenAI API requires a string value
-	messageContent := resp.Choices[0].Message.Content
-	if messageContent == "" {
-		messageContent = emptyContentKey
-	}
-
 	newMessages := []openai.ChatCompletionMessage{
 		{
 			Role:      openai.ChatMessageRoleAssistant,
-			Content:   messageContent,
+			Content:   resp.Choices[0].Message.Content,
 			ToolCalls: resp.Choices[0].Message.ToolCalls,
 		},
 	}
+
+	finalCall := false
+
+	logger.Debugf("Processing %d tool calls at depth %d", len(toolCalls), depth)
 
 	// Process each tool call and add the results
 	for _, tool := range toolCalls {
@@ -252,35 +252,42 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 		// Add the tool response message
 		newMessages = append(newMessages, createToolResponse(tool.ID, result, err))
+
+		if o.EnabledTools.IsFinal(tool.Function.Name) {
+			logger.Debugf("Final tool call detected: %s", tool.Function.Name)
+			finalCall = true
+		}
 	}
 
-	// Combine existing messages with new ones to maintain full conversation history
-	allMessages := append(existingMessages, newMessages...)
+	responseContent := ""
+	if !finalCall {
+		// Combine existing messages with new ones to maintain full conversation history
+		allMessages := append(existingMessages, newMessages...)
 
-	// Create and send follow-up request with tool results
-	toolChoice := ToolUseAuto
+		// Create new context with incremented depth and message history
+		newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
+		defer cancel()
+		newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
+		newCtx = context.WithValue(newCtx, messagesKey, allMessages)
 
-	// Create new context with incremented depth and message history
-	newCtx, cancel := context.WithTimeout(context.Background(), time.Duration(o.apiTimeout)*time.Second)
-	defer cancel()
-	newCtx = context.WithValue(newCtx, toolCallDepthKey, depth+1)
-	newCtx = context.WithValue(newCtx, messagesKey, allMessages)
+		// Log conversation state for debugging
+		logger.Debugf("Sending next prompt with %d total accumulated messages at depth %d", len(allMessages), depth+1)
 
-	// Log conversation state for debugging
-	logger.Debugf("Sending next prompt with %d total accumulated messages at depth %d", len(allMessages), depth+1)
+		// Get response from the next recursive prompt with full conversation history
+		nextResponse := o.promptWithContext(newCtx, originalReq, allMessages)
 
-	// Get response from the next recursive prompt with full conversation history
-	nextResponse := o.promptWithContext(newCtx, originalReq, allMessages, toolChoice)
+		// If there was an error in the next call, return it directly
+		if nextResponse.Error != nil {
+			return nextResponse
+		}
 
-	// If there was an error in the next call, return it directly
-	if nextResponse.Error != nil {
-		return nextResponse
-	}
-
-	// Return the combined response including all tool calls and history
-	responseContent := nextResponse.Content
-	if responseContent == "" {
-		responseContent = emptyContentKey
+		// Return the combined response including all tool calls and history
+		responseContent := nextResponse.Content
+		if responseContent == "" {
+			responseContent = emptyContentKey
+		}
+	} else {
+		responseContent = newMessages[len(newMessages)-1].Content
 	}
 
 	return Response{
@@ -290,7 +297,7 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 }
 
 // getTools returns the list of available tools
-func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
+func (o *OpenAIModel) getTools(depth int) []openai.Tool {
 	// List directory
 	ListDirTool := openai.Tool{
 		Type: openai.ToolTypeFunction,
@@ -656,46 +663,50 @@ func (o *OpenAIModel) getTools(forceSummary bool) []openai.Tool {
 		},
 	}
 
-	requiredTools := []openai.Tool{}
-	if o.EnabledTools.PostSummary {
-		requiredTools = append(requiredTools, postSummaryTool)
+	enabledTools := []string{}
+	if depth == 1 {
+		enabledTools = append(enabledTools, ToolTypeInitalizer)
 	}
-	if o.EnabledTools.PostBuildSummary {
-		requiredTools = append(requiredTools, postBuildSummaryTool)
+	if depth >= maxToolCallDepth {
+		enabledTools = append(enabledTools, ToolTypeFinalizer)
 	}
-
-	optionalTools := []openai.Tool{}
-	if o.EnabledTools.ListDirectory {
-		optionalTools = append(optionalTools, ListDirTool)
-	}
-	if o.EnabledTools.GetGitDiff {
-		optionalTools = append(optionalTools, gitDiffTool)
-	}
-	if o.EnabledTools.ReadFile {
-		optionalTools = append(optionalTools, readFileTool)
-	}
-	if o.EnabledTools.SearchCodebase {
-		optionalTools = append(optionalTools, searchCodebaseTool)
-	}
-	if o.EnabledTools.GetGitBlame {
-		optionalTools = append(optionalTools, gitBlameTool)
-	}
-	if o.EnabledTools.GetPullRequestDetails {
-		optionalTools = append(optionalTools, getPullRequestDetailsTool)
-	}
-	if o.EnabledTools.GetBuildLog {
-		optionalTools = append(optionalTools, getBuildLogsTool)
-	}
-	if o.EnabledTools.PostLineFeedback {
-		optionalTools = append(optionalTools, postLineFeedbackTool)
+	if depth > 1 && depth < maxToolCallDepth {
+		enabledTools = append(enabledTools, ToolTypeHelper)
 	}
 
-	if forceSummary {
-		return requiredTools
+	tools := []openai.Tool{}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.PostSummary) {
+		tools = append(tools, postSummaryTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.PostBuildSummary) {
+		tools = append(tools, postBuildSummaryTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.ListDirectory) {
+		tools = append(tools, ListDirTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetGitDiff) {
+		tools = append(tools, gitDiffTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.ReadFile) {
+		tools = append(tools, readFileTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.SearchCodebase) {
+		tools = append(tools, searchCodebaseTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetGitBlame) {
+		tools = append(tools, gitBlameTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetPullRequestDetails) {
+		tools = append(tools, getPullRequestDetailsTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetBuildLog) {
+		tools = append(tools, getBuildLogsTool)
+	}
+	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.PostLineFeedback) {
+		tools = append(tools, postLineFeedbackTool)
 	}
 
-	optionalTools = append(optionalTools, requiredTools...)
-	return optionalTools
+	return tools
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {
@@ -1079,14 +1090,14 @@ func (o *OpenAIModel) processPostBuildSummaryToolCall(argumentsJSON string) (str
 }
 
 // createChatCompletionRequest creates a standard chat completion request with common settings
-func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, toolChoice string, forceSummary bool) openai.ChatCompletionRequest {
+func (o *OpenAIModel) createChatCompletionRequest(messages []openai.ChatCompletionMessage, depth int) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:       o.modelName,
 		Messages:    messages,
 		MaxTokens:   o.maxTokens,
 		Temperature: 0.2,
-		Tools:       o.getTools(forceSummary),
-		ToolChoice:  toolChoice,
+		Tools:       o.getTools(depth),
+		ToolChoice:  "required",
 	}
 }
 
