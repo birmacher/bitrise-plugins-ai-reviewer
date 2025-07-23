@@ -145,6 +145,7 @@ func PostBuildSummary(summary, suggestion string) error {
 ` + suggestion
 	}
 
+	logger.Debug("Posting build summary:", body)
 	cmd := exec.Command("bitrise", ":annotations", "annotate", body, "--style", "info", "--context", "ai-summary")
 
 	var output strings.Builder

@@ -663,47 +663,49 @@ func (o *OpenAIModel) getTools(depth int) []openai.Tool {
 		},
 	}
 
-	enabledTools := []string{}
+	enabledToolsType := []string{}
 	if depth == 1 {
-		enabledTools = append(enabledTools, ToolTypeInitalizer)
+		enabledToolsType = []string{ToolTypeInitalizer}
 	}
 	if depth >= maxToolCallDepth {
-		enabledTools = append(enabledTools, ToolTypeFinalizer)
+		enabledToolsType = []string{ToolTypeFinalizer}
 	}
 	if depth > 1 && depth < maxToolCallDepth {
-		enabledTools = append(enabledTools, ToolTypeHelper)
+		enabledToolsType = []string{ToolTypeHelper, ToolTypeFinalizer}
 	}
 
 	tools := []openai.Tool{}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.PostSummary) {
-		tools = append(tools, postSummaryTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.PostBuildSummary) {
-		tools = append(tools, postBuildSummaryTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.ListDirectory) {
-		tools = append(tools, ListDirTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetGitDiff) {
-		tools = append(tools, gitDiffTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.ReadFile) {
-		tools = append(tools, readFileTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.SearchCodebase) {
-		tools = append(tools, searchCodebaseTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetGitBlame) {
-		tools = append(tools, gitBlameTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetPullRequestDetails) {
-		tools = append(tools, getPullRequestDetailsTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.GetBuildLog) {
-		tools = append(tools, getBuildLogsTool)
-	}
-	if len(enabledTools) > 0 && slices.Contains(enabledTools, o.EnabledTools.PostLineFeedback) {
-		tools = append(tools, postLineFeedbackTool)
+	if len(enabledToolsType) > 0 {
+		if slices.Contains(enabledToolsType, o.EnabledTools.PostSummary) {
+			tools = append(tools, postSummaryTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.PostBuildSummary) {
+			tools = append(tools, postBuildSummaryTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.ListDirectory) {
+			tools = append(tools, ListDirTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.GetGitDiff) {
+			tools = append(tools, gitDiffTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.ReadFile) {
+			tools = append(tools, readFileTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.SearchCodebase) {
+			tools = append(tools, searchCodebaseTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.GetGitBlame) {
+			tools = append(tools, gitBlameTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.GetPullRequestDetails) {
+			tools = append(tools, getPullRequestDetailsTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.GetBuildLog) {
+			tools = append(tools, getBuildLogsTool)
+		}
+		if slices.Contains(enabledToolsType, o.EnabledTools.PostLineFeedback) {
+			tools = append(tools, postLineFeedbackTool)
+		}
 	}
 
 	return tools
