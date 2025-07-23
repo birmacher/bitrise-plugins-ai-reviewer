@@ -100,7 +100,16 @@ var summarizeCmd = &cobra.Command{
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		llmClient, err := llm.NewLLM(provider, model)
+		llmClient, err := llm.NewLLM(provider, model, llm.WithEnabledTools(llm.EnabledTools{
+			GetPullRequestDetails: llm.ToolTypeInitalizer,
+			GetGitDiff:            llm.ToolTypeHelper,
+			ListDirectory:         llm.ToolTypeHelper,
+			ReadFile:              llm.ToolTypeHelper,
+			SearchCodebase:        llm.ToolTypeHelper,
+			GetGitBlame:           llm.ToolTypeHelper,
+			PostLineFeedback:      llm.ToolTypeHelper,
+			PostSummary:           llm.ToolTypeFinalizer,
+		}))
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
 			logger.Errorf(errMsg)
