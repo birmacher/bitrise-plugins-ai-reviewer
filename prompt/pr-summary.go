@@ -4,7 +4,7 @@ import (
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
-func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commitHash, destBranch string) string {
+func PRSummaryPrompt(settings common.Settings, repoOwner, repoName, pr, commitHash, destBranch string) string {
 	return `Provide your final response with the following content:
 ## Pull Request Details
 - **Repository**: ` + repoOwner + `/` + repoName + `
@@ -15,7 +15,7 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 Can you review PR ` + pr + ` on repo ` + repoOwner + `/` + repoName + ` (commit: ` + commitHash + `, branch: ` + destBranch + `)?`
 }
 
-func GetPRSummaryToolPrompt(availableTools string) string {
+func PRSummaryToolPrompt(availableTools string) string {
 	return `## You can use the following tools:
 ` + availableTools + `
 ## Guidelines

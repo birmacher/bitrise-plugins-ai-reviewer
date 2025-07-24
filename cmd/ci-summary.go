@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var buildSummaryCmd = &cobra.Command{
-	Use:   "build-summary",
-	Short: "Summarize build failures using AI",
-	Long:  `Analyze build failures and provide summary using AI capabilities.`,
+var ciSummaryCmd = &cobra.Command{
+	Use:   "ci-summary",
+	Short: "Summarize CI failures using AI",
+	Long:  `Analyze CI failures and provide summary using AI capabilities.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger.Info("Running AI build summary...")
+		logger.Info("Starting CI Summary Agent 🤖")
 
 		// Parse settings from command line flags
 		settings := parseSettings()
@@ -74,8 +74,8 @@ var buildSummaryCmd = &cobra.Command{
 
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(settings) + "\n" + prompt.GetBuildSummaryToolPrompt(toolsAvailable),
-			UserPrompt:   prompt.GetBuildSummaryPrompt(ciProvider, buildID, appID, commitHash),
+			SystemPrompt: prompt.GetSystemPrompt(settings) + "\n" + prompt.CISummaryToolPrompt(toolsAvailable),
+			UserPrompt:   prompt.CISummaryPrompt(ciProvider, buildID, appID, commitHash),
 		}
 
 		// Send the prompt and get the response
@@ -92,9 +92,9 @@ var buildSummaryCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(buildSummaryCmd)
+	rootCmd.AddCommand(ciSummaryCmd)
 
 	// LLM
-	buildSummaryCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
-	buildSummaryCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
+	ciSummaryCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
+	ciSummaryCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
 }

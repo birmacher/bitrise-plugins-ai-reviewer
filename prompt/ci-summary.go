@@ -1,6 +1,6 @@
 package prompt
 
-func GetBuildSummaryPrompt(provider, buildID, appID, commitHash string) string {
+func CISummaryPrompt(provider, buildID, appID, commitHash string) string {
 	return `You are helping to identify the error in a CI environment. The goal is to clearly indicate the error and suggest a fix.
 ## CI Properties
 - **CI Provider**: ` + provider + `
@@ -11,7 +11,7 @@ func GetBuildSummaryPrompt(provider, buildID, appID, commitHash string) string {
 Please review the log errors for this Build ID ` + buildID + ` with App ID ` + appID + `.`
 }
 
-func GetBuildSummaryToolPrompt(availableTools string) string {
+func CISummaryToolPrompt(availableTools string) string {
 	return `## You can use the following tools:
 ` + availableTools + `
 ### Guidelines
