@@ -10,15 +10,14 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ai-reviewer",
-	Short: "Bitrise AI Reviewer - A plugin for code review using AI",
-	Long: `Bitrise AI Reviewer is a CLI plugin for the Bitrise CLI that helps review code changes using AI.
-It can analyze pull requests and provide feedback, suggestions, and potential issue detection.`,
+	Use:   "agent",
+	Short: "Bitrise Agent - A plugin for agent-based operations",
+	Long:  `Bitrise Agent is a CLI plugin for the Bitrise CLI that helps automate tasks using AI.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		logger.SetLevel(logLevel)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		logger.Info("Bitrise Agent is running. Use 'bitrise agent --help' for available commands.")
 	},
 }
 

@@ -14,8 +14,6 @@ func main() {
 	logger.Init("info")
 	defer logger.Sync()
 
-	logger.Info("Starting Bitrise AI Reviewer")
-
 	if err := cmd.Execute(); err != nil {
 		logger.Errorf("Execution failed: %v", err)
 		os.Exit(1)
