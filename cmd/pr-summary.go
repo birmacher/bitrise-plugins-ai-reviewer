@@ -15,12 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var summarizeCmd = &cobra.Command{
-	Use:   "summarize",
-	Short: "Summarize code changes using AI",
-	Long:  `Analyze code changes and provide summary using AI capabilities.`,
+var prSummaryCmd = &cobra.Command{
+	Use:   "pr-summary",
+	Short: "Summarize PR changes using AI",
+	Long:  `Analyze Pull Request code changes and provide summary using AI capabilities.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger.Info("Running AI code review...")
+		logger.Info("Starting PR Summary Agent 🤖")
 
 		// Parse settings from command line flags
 		settings := parseSettings()
@@ -100,7 +100,16 @@ var summarizeCmd = &cobra.Command{
 		provider, _ := cmd.Flags().GetString("provider")
 		model, _ := cmd.Flags().GetString("model")
 
-		llmClient, err := llm.NewLLM(provider, model)
+		llmClient, err := llm.NewLLM(provider, model, llm.WithEnabledTools(llm.EnabledTools{
+			GetPullRequestDetails: llm.ToolTypeInitalizer,
+			GitDiff:               llm.ToolTypeHelper,
+			ListDirectory:         llm.ToolTypeHelper,
+			ReadFile:              llm.ToolTypeHelper,
+			SearchCodebase:        llm.ToolTypeHelper,
+			GitBlame:              llm.ToolTypeHelper,
+			PostLineFeedback:      llm.ToolTypeHelper,
+			PostPRSummary:         llm.ToolTypeFinalizer,
+		}))
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
 			logger.Errorf(errMsg)
@@ -112,10 +121,17 @@ var summarizeCmd = &cobra.Command{
 		}
 		llmClient.SetSettings(&settings)
 
+		// Agent usage
+		toolsAvailable := llmClient.GetEnabledTools().UseString([]string{
+			llm.ToolTypeInitalizer,
+			llm.ToolTypeHelper,
+			llm.ToolTypeFinalizer,
+		})
+
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(settings),
-			UserPrompt:   prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
+			SystemPrompt: prompt.GetSystemPrompt(settings) + "\n" + prompt.PRSummaryToolPrompt(toolsAvailable),
+			UserPrompt:   prompt.PRSummaryPrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
 		}
 
 		// Send the prompt and get the response
@@ -228,21 +244,17 @@ var summarizeCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(summarizeCmd)
+	rootCmd.AddCommand(prSummaryCmd)
 
 	// LLM
-	summarizeCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
-	summarizeCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
+	prSummaryCmd.Flags().StringP("provider", "p", "openai", "LLM provider to use for summarization")
+	prSummaryCmd.Flags().StringP("model", "m", "gpt-4.1", "LLM model to use for summarization")
 	// Git
-	summarizeCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
-	summarizeCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
-	summarizeCmd.Flags().StringP("branch", "b", "", "Target Branch to merge with")
+	prSummaryCmd.Flags().StringP("commit", "c", "", "Analyze changes in the specified commit's perspective")
+	prSummaryCmd.Flags().Lookup("commit").NoOptDefVal = "HEAD"
+	prSummaryCmd.Flags().StringP("branch", "b", "", "Target Branch to merge with")
 	// Code Review
-	summarizeCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
-	summarizeCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
-	summarizeCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
-}
-
-func parseSettings() common.Settings {
-	return common.WithYamlFile()
+	prSummaryCmd.Flags().StringP("code-review", "r", "", "Code review provider to use (e.g., github, gitlab)")
+	prSummaryCmd.Flags().StringP("repo", "", "", "Repository name in the format 'owner/repo' (e.g., 'my-org/my-repo')")
+	prSummaryCmd.Flags().StringP("pr", "", "", "Pull Request number to post the review to")
 }
