@@ -53,21 +53,28 @@ var buildSummaryCmd = &cobra.Command{
 		model, _ := cmd.Flags().GetString("model")
 
 		llmClient, err := llm.NewLLM(provider, model, llm.WithEnabledTools(llm.EnabledTools{
-			GetBuildLog:      llm.ToolTypeInitalizer,
-			ListDirectory:    llm.ToolTypeHelper,
-			GetGitDiff:       llm.ToolTypeHelper,
-			ReadFile:         llm.ToolTypeHelper,
-			SearchCodebase:   llm.ToolTypeHelper,
-			GetGitBlame:      llm.ToolTypeHelper,
-			PostBuildSummary: llm.ToolTypeFinalizer,
+			GetCIBuildLog:  llm.ToolTypeInitalizer,
+			ListDirectory:  llm.ToolTypeHelper,
+			GitDiff:        llm.ToolTypeHelper,
+			ReadFile:       llm.ToolTypeHelper,
+			SearchCodebase: llm.ToolTypeHelper,
+			GitBlame:       llm.ToolTypeHelper,
+			PostCISummary:  llm.ToolTypeFinalizer,
 		}))
 		if err != nil {
 			return fmt.Errorf("failed to create client for provider: %v", err)
 		}
 
+		// Agent usage
+		toolsAvailable := llmClient.GetEnabledTools().UseString([]string{
+			llm.ToolTypeInitalizer,
+			llm.ToolTypeHelper,
+			llm.ToolTypeFinalizer,
+		})
+
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(settings, cmd.Use),
+			SystemPrompt: prompt.GetSystemPrompt(settings) + "\n" + prompt.GetBuildSummaryToolPrompt(toolsAvailable),
 			UserPrompt:   prompt.GetBuildSummaryPrompt(ciProvider, buildID, appID, commitHash),
 		}
 

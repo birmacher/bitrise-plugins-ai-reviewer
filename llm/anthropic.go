@@ -23,6 +23,7 @@ type AnthropicModel struct {
 	GitProvider  *review.Reviewer
 	Settings     *common.Settings
 	LineFeedback []common.LineLevel
+	EnabledTools EnabledTools
 }
 
 // NewAnthropic creates a new Anthropic client
@@ -71,6 +72,10 @@ func NewAnthropic(apiKey string, opts ...Option) (*AnthropicModel, error) {
 	}
 
 	return model, nil
+}
+
+func (a *AnthropicModel) GetEnabledTools() EnabledTools {
+	return a.EnabledTools
 }
 
 func (a *AnthropicModel) SetGitProvider(gitProvider *review.Reviewer) {

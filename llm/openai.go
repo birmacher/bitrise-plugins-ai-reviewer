@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -88,6 +87,10 @@ func NewOpenAI(apiKey string, opts ...Option) (*OpenAIModel, error) {
 	}
 
 	return model, nil
+}
+
+func (o *OpenAIModel) GetEnabledTools() EnabledTools {
+	return o.EnabledTools
 }
 
 func (o *OpenAIModel) SetGitProvider(gitProvider *review.Reviewer) {
@@ -226,25 +229,25 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 		// Dispatch to appropriate tool handler
 		switch tool.Function.Name {
-		case "list_directory":
+		case ToolTypeListDirectory:
 			result, err = o.processListDirToolCall(tool.Function.Arguments)
-		case "get_git_diff":
+		case ToolTypeGitDiff:
 			result, err = o.processGitDiffToolCall(tool.Function.Arguments)
-		case "read_file":
+		case ToolTypeReadFile:
 			result, err = o.processReadFileToolCall(tool.Function.Arguments)
-		case "search_codebase":
+		case ToolTypeSearchCodebase:
 			result, err = o.processSearchCodebaseToolCall(tool.Function.Arguments)
-		case "get_git_blame":
+		case ToolTypeGitBlame:
 			result, err = o.processGitBlameToolCall(tool.Function.Arguments)
-		case "get_pull_request_details":
+		case ToolTypeGetPullRequestDetails:
 			result, err = o.processGetPullRequestDetailsToolCall(tool.Function.Arguments)
-		case "post_summary":
+		case ToolTypePostPRSummary:
 			result, err = o.processPostSummaryToolCall(tool.Function.Arguments)
-		case "post_line_feedback":
+		case ToolTypePostLineFeedback:
 			result, err = o.processPostLineFeedbackToolCall(tool.Function.Arguments)
-		case "get_build_logs":
+		case ToolTypeGetCIBuildLog:
 			result, err = o.processGetBuildLogsToolCall(tool.Function.Arguments)
-		case "post_build_summary":
+		case ToolTypePostCISummary:
 			result, err = o.processPostBuildSummaryToolCall(tool.Function.Arguments)
 		default:
 			err = fmt.Errorf("unknown tool: %s", tool.Function.Name)
@@ -298,371 +301,6 @@ func (o *OpenAIModel) handleToolCalls(ctx context.Context, resp openai.ChatCompl
 
 // getTools returns the list of available tools
 func (o *OpenAIModel) getTools(depth int) []openai.Tool {
-	// List directory
-	ListDirTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "list_directory",
-			Description: "Lists all the files inside the git repository",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"ref": map[string]interface{}{
-						"type":        "string",
-						"description": "Optional git reference (branch, tag, or commit hash) to list the directory from. If not provided, reads from the current working directory.",
-					},
-				},
-				"required": []string{},
-				"examples": []map[string]interface{}{
-					{},
-					{
-						"ref": "HEAD",
-					},
-				},
-			},
-		},
-	}
-
-	// Define the git diff tool
-	gitDiffTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "get_git_diff",
-			Description: "Gets the diff between two git references (commits, branches, or tags) showing code changes",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"source": map[string]interface{}{
-						"type":        "string",
-						"description": "The source branch or commit with changes (e.g., feature branch, PR commit)",
-					},
-					"target": map[string]interface{}{
-						"type":        "string",
-						"description": "The target branch the changes will be merged into (e.g., 'main', 'develop')",
-					},
-				},
-				"required": []string{"source", "target"},
-				"examples": []map[string]interface{}{
-					{
-						"source": "5d7f7ce9c705d2f6bfcac3ae35f5bbc9ba736b5a",
-						"target": "master",
-					},
-					{
-						"source": "feature/branch",
-						"target": "master",
-					},
-				},
-			},
-		},
-	}
-
-	// Define the file reading tool
-	readFileTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "read_file",
-			Description: "Reads the content of a file from the repository or filesystem",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "The relative path to the file within the repository",
-					},
-					"ref": map[string]interface{}{
-						"type":        "string",
-						"description": "Optional git reference (branch, tag, or commit hash) to read the file from. If not provided, reads from the current working directory.",
-					},
-					"startLine": map[string]interface{}{
-						"type":        "integer",
-						"description": "Optional starting line number (1-indexed). If provided with endLine, only returns the specified range of lines.",
-					},
-					"endLine": map[string]interface{}{
-						"type":        "integer",
-						"description": "Optional ending line number (1-indexed, inclusive). Must be used with startLine.",
-					},
-				},
-				"required": []string{"path"},
-				"examples": []map[string]interface{}{
-					{
-						"path": "main.go",
-					},
-					{
-						"path":      "cmd/root.go",
-						"startLine": 10,
-						"endLine":   20,
-					},
-					{
-						"path": "llm/openai.go",
-						"ref":  "main",
-					},
-				},
-			},
-		},
-	}
-
-	searchCodebaseTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "search_codebase",
-			Description: "Searches for a string or regex pattern in the codebase. Returns file paths and line numbers where the pattern matches.",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"query": map[string]interface{}{
-						"type":        "string",
-						"description": "The string or regex pattern to search for.",
-					},
-					"ref": map[string]interface{}{
-						"type":        "string",
-						"description": "Optional git reference (branch, tag, or commit hash) to search in. Defaults to current working directory.",
-					},
-					"use_regex": map[string]interface{}{
-						"type":        "boolean",
-						"description": "If true, treats the query as a regex pattern.",
-					},
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "Optional: Restrict search to files under this directory path.",
-					},
-				},
-				"required": []string{"query"},
-			},
-		},
-	}
-
-	// Define the git blame tool
-	gitBlameTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "get_git_blame",
-			Description: "Gets git blame information for a file or specific lines in a file, showing which commits last modified each line",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"path": map[string]interface{}{
-						"type":        "string",
-						"description": "The relative path to the file within the repository",
-					},
-					"startLine": map[string]interface{}{
-						"type":        "integer",
-						"description": "Optional starting line number (1-indexed). If provided with endLine, only returns blame for the specified range of lines.",
-					},
-					"endLine": map[string]interface{}{
-						"type":        "integer",
-						"description": "Optional ending line number (1-indexed, inclusive). Must be used with startLine.",
-					},
-					"ref": map[string]interface{}{
-						"type":        "string",
-						"description": "Optional git reference (branch, tag, or commit hash) to get blame for. If not provided, uses HEAD.",
-					},
-				},
-				"required": []string{"path"},
-				"examples": []map[string]interface{}{
-					{
-						"path": "main.go",
-					},
-					{
-						"path":      "cmd/root.go",
-						"startLine": 10,
-						"endLine":   20,
-					},
-				},
-			},
-		},
-	}
-
-	getPullRequestDetailsTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "get_pull_request_details",
-			Description: "Retrieves details about a pull request, including its title, description, author, and status",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"repo_owner": map[string]interface{}{
-						"type":        "string",
-						"description": "The owner of the repository (e.g., 'bitrise-io')",
-					},
-					"repo_name": map[string]interface{}{
-						"type":        "string",
-						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
-					},
-					"pr_number": map[string]interface{}{
-						"type":        "integer",
-						"description": "The pull request number to retrieve details for",
-					},
-				},
-				"required": []string{"repo_owner", "repo_name", "pr_number"},
-				"examples": []map[string]interface{}{
-					{
-						"repo_owner": "bitrise-io",
-						"repo_name":  "bitrise-plugins-ai-reviewer",
-						"pr_number":  42,
-					},
-					{
-						"repo_owner": "bitrise-io",
-						"repo_name":  "bitrise-plugins-ai-reviewer",
-						"pr_number":  100,
-					},
-				},
-			},
-		},
-	}
-
-	postSummaryTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "post_summary",
-			Description: "Posts a summary of the code changes under review",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"repo_owner": map[string]interface{}{
-						"type":        "string",
-						"description": "The owner of the repository (e.g., 'bitrise-io')",
-					},
-					"repo_name": map[string]interface{}{
-						"type":        "string",
-						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
-					},
-					"pr_number": map[string]interface{}{
-						"type":        "integer",
-						"description": "The pull request number to retrieve details for",
-					},
-					"summary": map[string]interface{}{
-						"type":        "string",
-						"description": "A high-level, to-the-point, short summary of the overall change instead of specific files within 80 words.",
-					},
-					"walkthrough": map[string]interface{}{
-						"type":        "integer",
-						"description": "Files that changed and the change summary separated by ':'. Group files with similar changes together to save space. Separate lines by \n.",
-					},
-					"haiku": map[string]interface{}{
-						"type":        "string",
-						"description": "A whimsical, short haiku to celebrate the changes as 'Bit Bot'. Format the haiku as a quote using the '>' symbol and feel free to use emojis where relevant.",
-					},
-				},
-				"required": []string{"repo_owner", "repo_name", "pr_number", "summary", "walkthrough", "haiku"},
-				"examples": []map[string]interface{}{
-					{
-						"repo_owner":  "bitrise-io",
-						"repo_name":   "bitrise-plugins-ai-reviewer",
-						"pr_number":   42,
-						"summary":     "This PR implements a new feature that allows users to filter search results by date.",
-						"walkthrough": "main.go: Implemented search filtering by date\ncmd/root.go: Updated CLI commands to support new filter options",
-						"haiku":       "> New tools in the breeze\n> Codebase whispers, search, blame, fetch—\n> Review magic grows 🌱🤖",
-					},
-				},
-			},
-		},
-	}
-
-	postLineFeedbackTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "post_line_feedback",
-			Description: "Posts found issues as line-level feedback for a pull request",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"repo_owner": map[string]interface{}{
-						"type":        "string",
-						"description": "The owner of the repository (e.g., 'bitrise-io')",
-					},
-					"repo_name": map[string]interface{}{
-						"type":        "string",
-						"description": "The name of the repository (e.g., 'bitrise-plugins-ai-reviewer')",
-					},
-					"pr_number": map[string]interface{}{
-						"type":        "integer",
-						"description": "The pull request number to retrieve details for",
-					},
-					"file": map[string]interface{}{
-						"type":        "string",
-						"description": "The relative path to the file within the repository",
-					},
-					"issue": map[string]interface{}{
-						"type":        "string",
-						"description": "A description of the issue found in the code",
-					},
-					"category": map[string]interface{}{
-						"type":        "string",
-						"description": "The category of the feedback from: bug, refactor, improvement, documentation, nitpick, test coverage, security.",
-					},
-					"line": map[string]interface{}{
-						"type":        "string",
-						"description": "The exact line from the diff hunk that you are commenting on.",
-					},
-					"prompt": map[string]interface{}{
-						"type":        "string",
-						"description": "A short, clear instruction for an AI agent to fix the issue (imperative; do not include file or line number).",
-					},
-					"suggestion": map[string]interface{}{
-						"type":        "string",
-						"description": "An optional suggestion for how to fix the issue. If provided, it should be a complete code snippet that can be applied directly to the file.",
-					},
-				},
-				"required": []string{"repo_owner", "repo_name", "pr_number", "file", "issue", "category", "line", "prompt"},
-				"examples": []map[string]interface{}{
-					{
-						"repo_owner": "bitrise-io",
-						"repo_name":  "bitrise-plugins-ai-reviewer",
-						"pr_number":  42,
-						"file":       "main.go",
-						"issue":      "This line has a potential bug where the variable is not initialized before use.",
-						"category":   "bug",
-						"line":       "\t\tif x > 0 {",
-						"prompt":     "Initialize the variable x before using it to avoid potential runtime errors",
-						"suggestion": "\tx := 0 // Initialize x before use\n\t\tif x > 0 {",
-					},
-				},
-			},
-		},
-	}
-
-	getBuildLogsTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "get_build_logs",
-			Description: "Retrieves the build logs for a specific build",
-			Parameters: map[string]interface{}{
-				"type":       "object",
-				"properties": map[string]interface{}{},
-				"required":   []string{},
-				"examples":   []map[string]interface{}{},
-			},
-		},
-	}
-
-	postBuildSummaryTool := openai.Tool{
-		Type: openai.ToolTypeFunction,
-		Function: &openai.FunctionDefinition{
-			Name:        "post_build_summary",
-			Description: "Posts a summary of the build results",
-			Parameters: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"summary": map[string]interface{}{
-						"type":        "string",
-						"description": "A summary of the build results, including success/failure status and any relevant details",
-					},
-					"suggestion": map[string]interface{}{
-						"type":        "string",
-						"description": "An optional suggestion for how to improve the build process or fix any issues",
-					},
-				},
-				"required": []string{"summary"},
-				"examples": []map[string]interface{}{
-					{
-						"summary":    "Build completed successfully with no errors.",
-						"suggestion": "Consider adding more unit tests to improve code coverage.",
-					},
-				},
-			},
-		},
-	}
-
 	enabledToolsType := []string{}
 	if depth == 1 {
 		enabledToolsType = []string{ToolTypeInitalizer}
@@ -674,41 +312,21 @@ func (o *OpenAIModel) getTools(depth int) []openai.Tool {
 		enabledToolsType = []string{ToolTypeHelper, ToolTypeFinalizer}
 	}
 
-	tools := []openai.Tool{}
-	if len(enabledToolsType) > 0 {
-		if slices.Contains(enabledToolsType, o.EnabledTools.PostSummary) {
-			tools = append(tools, postSummaryTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.PostBuildSummary) {
-			tools = append(tools, postBuildSummaryTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.ListDirectory) {
-			tools = append(tools, ListDirTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.GetGitDiff) {
-			tools = append(tools, gitDiffTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.ReadFile) {
-			tools = append(tools, readFileTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.SearchCodebase) {
-			tools = append(tools, searchCodebaseTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.GetGitBlame) {
-			tools = append(tools, gitBlameTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.GetPullRequestDetails) {
-			tools = append(tools, getPullRequestDetailsTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.GetBuildLog) {
-			tools = append(tools, getBuildLogsTool)
-		}
-		if slices.Contains(enabledToolsType, o.EnabledTools.PostLineFeedback) {
-			tools = append(tools, postLineFeedbackTool)
-		}
+	toolParams := o.EnabledTools.ToolParams(enabledToolsType)
+
+	OpenAITools := []openai.Tool{}
+	for _, tool := range toolParams {
+		OpenAITools = append(OpenAITools, openai.Tool{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        tool.Name,
+				Description: tool.Description,
+				Parameters:  tool.Properties,
+			},
+		})
 	}
 
-	return tools
+	return OpenAITools
 }
 
 func (o *OpenAIModel) processListDirToolCall(argumentsJSON string) (string, error) {

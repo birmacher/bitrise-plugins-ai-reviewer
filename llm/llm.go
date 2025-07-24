@@ -82,8 +82,8 @@ type Tools struct {
 
 // LLM defines the interface for language model prompting
 type LLM interface {
-	// Prompt sends a request to the language model and returns its response
 	Prompt(req Request) Response
+	GetEnabledTools() EnabledTools
 	SetGitProvider(gitProvider *review.Reviewer)
 	SetSettings(settings *common.Settings)
 	GetLineFeedback() []common.LineLevel

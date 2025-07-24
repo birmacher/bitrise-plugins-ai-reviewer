@@ -1,8 +1,6 @@
 package prompt
 
 import (
-	"strings"
-
 	"github.com/bitrise-io/bitrise-plugins-ai-reviewer/common"
 )
 
@@ -13,37 +11,29 @@ func GetSummarizePrompt(settings common.Settings, repoOwner, repoName, pr, commi
 - **Pull Request**: ` + pr + `
 - **Commit Hash**: ` + commitHash + `
 - **Destination Branch**: ` + destBranch + `
-## During review
-- post_line_feedback immediately after finding an issue, do not wait for the review to finish
-- post_summary at the end of the review, summarizing the changes and issues found
-- for the summary include: ` + getSummary(settings) + `
-## Finished
-Once line feedbacks and summary posted you should reply with a "done" message, and do not call any more tools.
+## Task
+Can you review PR ` + pr + ` on repo ` + repoOwner + `/` + repoName + ` (commit: ` + commitHash + `, branch: ` + destBranch + `)?`
+}
+
+func GetPRSummaryToolPrompt(availableTools string) string {
+	return `## You can use the following tools:
+` + availableTools + `
 ## Guidelines
 - Only include lines present in the diff hunk. Do not make up or synthesize lines.
 - Focus on bugs, code smells, security issues, and code quality improvements. Categorize appropriately.
 - For "nitpick", only flag truly minor, non-blocking style suggestions.
 - If multiple lines should be replaced, the suggestion should include the full replacement block.
 - Avoid additional commentary as the response will be added as a comment on the GitHub pull request.
-## Task
-Can you review PR ` + pr + ` on repo ` + repoOwner + `/` + repoName + ` (commit: ` + commitHash + `, branch: ` + destBranch + `)?`
-}
-
-func getSummary(settings common.Settings) string {
-	if settings.Reviews.Summary {
-		include := []string{}
-		if settings.Reviews.Summary {
-			include = append(include, "summary")
-		}
-		if settings.Reviews.Walkthrough {
-			include = append(include, "walkthrough")
-		}
-		if settings.Reviews.Haiku {
-			include = append(include, "haiku")
-		}
-
-		return strings.Join(include, ", ")
-	}
-
-	return `Skip sending summary`
+## Follow these steps:
+1. **Before Review**
+- Get the pull request details first to understand the context.
+2. **During Review**
+- Get the diff to see what has changed.
+- If the diff references a function not defined there, search for it in the codebase.
+- If you want to know if a change might break usages elsewhere, search for it in the codebase.
+- If you want to suggest a refactor, search for all usages in the codebase.
+- If you need context about why something is written a certain way, search for it in the codebase.
+- After identifying the issues, immediately post line feedback for it, using the exact lines from the diff.
+3. **After Review**
+- Post a summary of the review findings, including any haiku or walkthrough.`
 }

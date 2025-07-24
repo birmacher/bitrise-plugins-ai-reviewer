@@ -102,13 +102,13 @@ var summarizeCmd = &cobra.Command{
 
 		llmClient, err := llm.NewLLM(provider, model, llm.WithEnabledTools(llm.EnabledTools{
 			GetPullRequestDetails: llm.ToolTypeInitalizer,
-			GetGitDiff:            llm.ToolTypeHelper,
+			GitDiff:               llm.ToolTypeHelper,
 			ListDirectory:         llm.ToolTypeHelper,
 			ReadFile:              llm.ToolTypeHelper,
 			SearchCodebase:        llm.ToolTypeHelper,
-			GetGitBlame:           llm.ToolTypeHelper,
+			GitBlame:              llm.ToolTypeHelper,
 			PostLineFeedback:      llm.ToolTypeHelper,
-			PostSummary:           llm.ToolTypeFinalizer,
+			PostPRSummary:         llm.ToolTypeFinalizer,
 		}))
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create Client for LLM Provider: %v", err)
@@ -121,9 +121,16 @@ var summarizeCmd = &cobra.Command{
 		}
 		llmClient.SetSettings(&settings)
 
+		// Agent usage
+		toolsAvailable := llmClient.GetEnabledTools().UseString([]string{
+			llm.ToolTypeInitalizer,
+			llm.ToolTypeHelper,
+			llm.ToolTypeFinalizer,
+		})
+
 		// Setup the prompt
 		req := llm.Request{
-			SystemPrompt: prompt.GetSystemPrompt(settings, cmd.Use),
+			SystemPrompt: prompt.GetSystemPrompt(settings) + "\n" + prompt.GetPRSummaryToolPrompt(toolsAvailable),
 			UserPrompt:   prompt.GetSummarizePrompt(settings, repoOwner, repoName, prStr, commitHash, targetBranch),
 		}
 
