@@ -62,7 +62,7 @@ func GetBuildLog() (string, error) {
 	position := 0
 	isFinished := false
 	foundTargetMessage := false
-	targetLogMessage := "Running AI build summary..."
+	targetLogMessage := "Initializing Bitrise Agent with log level:"
 	interval := 5
 
 	appSlug, err := GetAppID()

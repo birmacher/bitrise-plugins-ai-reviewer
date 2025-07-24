@@ -71,7 +71,7 @@ func SetLevel(level string) {
 	} else {
 		zapLevel = zapcore.InfoLevel
 	}
-	Info("Changing log level to:", level)
+	Debug("Changing log level to:", level)
 
 	// Create new encoder config (same as in Init)
 	encoderConfig := zapcore.EncoderConfig{
